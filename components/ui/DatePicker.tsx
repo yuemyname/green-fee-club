@@ -40,7 +40,7 @@ export default function DatePicker({
           {isToday && (
             <span className="rounded-md bg-turf px-1.5 py-0.5 text-xs font-semibold text-fair">오늘</span>
           )}
-          <span className="text-xs text-sub">▾</span>
+          <span className="text-base font-bold text-fair">▾</span>
         </button>
         <button
           type="button"

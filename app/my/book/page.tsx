@@ -31,6 +31,7 @@ function MyBookInner() {
   const [useFree, setUseFree] = useState(false);
   const [busy, setBusy] = useState(false);
   const [prefilled, setPrefilled] = useState(false);
+  const [expandedRoom, setExpandedRoom] = useState<number | null>(null);
 
   const need = needMin(people);
 
@@ -96,6 +97,13 @@ function MyBookInner() {
     }
     return map;
   }, [board, date, need, editId]);
+
+  // 최초·조건 변경 시 예약 가능한 시간이 있는 첫 방만 자동으로 펼친다
+  useEffect(() => {
+    if (!board) return;
+    const first = board.rooms.find(r => (roomData.get(r.id)?.slots.length ?? 0) > 0);
+    setExpandedRoom(first?.id ?? null);
+  }, [board, roomData]);
 
   const pickPeople = (n: number) => {
     setPeople(n);
@@ -187,6 +195,10 @@ function MyBookInner() {
                 setSelection({ roomId: room.id, start });
                 setUseFree(false);
               }}
+              expanded={expandedRoom === room.id}
+              onToggle={() =>
+                setExpandedRoom(expandedRoom === room.id ? null : room.id)
+              }
             />
           ))}
         </div>
