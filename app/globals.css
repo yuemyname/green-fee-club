@@ -1,0 +1,21 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-paper: #FFFFFF;  /* 배경 */
+  --color-turf:  #EFF6F1;  /* 카드/강조 배경 (연한 잔디) */
+  --color-line:  #D9E7DE;  /* 모든 테두리 */
+  --color-fair:  #17663B;  /* 메인 그린 — 버튼, 강조 텍스트 */
+  --color-deep:  #0C3D22;  /* 제목, 토스트 배경 */
+  --color-mint:  #3F9B6A;  /* eyebrow 라벨 */
+  --color-ink:   #15231B;  /* 본문 */
+  --color-sub:   #65796D;  /* 보조 텍스트 */
+  --color-flag:  #C0392B;  /* 무료 예약권 전용 (핀 깃발 레드) */
+
+  --font-sans: 'Pretendard', 'Apple SD Gothic Neo', system-ui, sans-serif;
+}
+
+body {
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+}
