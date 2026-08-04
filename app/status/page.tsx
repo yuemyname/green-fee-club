@@ -1,9 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { listBoard, monthReservedDates, type Board } from '@/app/actions/reservation';
 import { buildTimeline } from '@/lib/timeline';
 import { fmtDate, todayStr } from '@/lib/time';
+import Btn from '@/components/ui/Btn';
 import Eyebrow from '@/components/ui/Eyebrow';
 import MonthCalendar from '@/components/MonthCalendar';
 import RoomTimeline from '@/components/RoomTimeline';
@@ -38,10 +40,16 @@ export default function StatusPage() {
 
   return (
     <div>
-      <Eyebrow>STATUS</Eyebrow>
-      <h1 className="mt-1 text-2xl font-black text-deep" style={{ letterSpacing: '-0.02em' }}>
-        예약 현황
-      </h1>
+      <Eyebrow>RESERVATION</Eyebrow>
+      <div className="mt-1 flex items-center justify-between">
+        <h1 className="text-2xl font-black text-deep" style={{ letterSpacing: '-0.02em' }}>
+          예약
+        </h1>
+        <Link href={`/book?date=${date}`}>
+          <Btn>+ 새 예약</Btn>
+        </Link>
+      </div>
+      <p className="mt-1 text-xs text-sub">빈 시간을 누르면 그 자리로 바로 예약할 수 있습니다.</p>
 
       <div className="mt-5">
         <MonthCalendar
