@@ -12,6 +12,7 @@ const MENUS = [
   { href: '/point', title: '포인트 적립', desc: '번호만 넣으면 도장 1개' },
   { href: '/status', title: '예약 현황', desc: '방별 빈 시간을 한눈에' },
   { href: '/customer', title: '고객 등록', desc: '이름과 번호만 받습니다' },
+  { href: '/rooms', title: '방 관리', desc: '운영시간과 예약 불가 시간 설정' },
 ];
 
 export default function MenuPage() {

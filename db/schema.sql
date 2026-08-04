@@ -30,3 +30,21 @@ create table if not exists reservations (
 
 create index if not exists reservations_date_room_start_idx
   on reservations (date, room_id, start_min);
+
+create table if not exists rooms (
+  id          bigserial primary key,
+  name        text not null,
+  open_min    int not null default 480,   -- 방별 운영 시작 (08:00)
+  close_min   int not null default 1440,  -- 방별 운영 종료 (24:00)
+  created_at  timestamptz default now()
+);
+
+create table if not exists blocks (
+  id          bigserial primary key,
+  room_id     bigint references rooms(id) on delete cascade,  -- null이면 모든 방
+  label       text not null default '예약 불가',
+  date        text,                                           -- null이면 매일 반복
+  start_min   int not null,
+  end_min     int not null,
+  created_at  timestamptz default now()
+);

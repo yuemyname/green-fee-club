@@ -59,6 +59,17 @@ export default function RoomTimeline({
       <div className="mt-3 space-y-2">
         {segments.map(seg => {
           const range = `${toHM(seg.start)} – ${toHM(seg.end)}`;
+          if (seg.type === 'blocked') {
+            return (
+              <div
+                key={seg.start}
+                className="flex min-h-11 items-center justify-between rounded-lg bg-line/50 px-3 py-2.5"
+              >
+                <span className="text-sm font-semibold text-sub tabular-nums">{range}</span>
+                <span className="text-xs font-semibold text-sub">{seg.label}</span>
+              </div>
+            );
+          }
           if (seg.type === 'open') {
             return (
               <button

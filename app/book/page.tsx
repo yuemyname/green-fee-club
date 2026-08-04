@@ -3,11 +3,11 @@
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { findByLast4 } from '@/app/actions/customer';
-import { createReservation, listByDate } from '@/app/actions/reservation';
-import { ROOMS, STAMP_GOAL } from '@/lib/constants';
+import { createReservation, listBoard, type Board } from '@/app/actions/reservation';
+import { STAMP_GOAL } from '@/lib/constants';
 import { buildTimeline, slotsFor } from '@/lib/timeline';
 import { fmtDate, fmtDur, needMin, toHM, todayStr } from '@/lib/time';
-import type { CustomerOverview, ReservationRow } from '@/lib/types';
+import type { CustomerOverview } from '@/lib/types';
 import Btn from '@/components/ui/Btn';
 import Card from '@/components/ui/Card';
 import DatePicker from '@/components/ui/DatePicker';
@@ -26,7 +26,7 @@ function BookInner() {
     const d = params.get('date');
     return d && /^\d{8}$/.test(d) ? d : todayStr();
   });
-  const [rows, setRows] = useState<ReservationRow[] | null>(null);
+  const [board, setBoard] = useState<Board | null>(null);
   const [selection, setSelection] = useState<Selection>(null);
   const [last4, setLast4] = useState('');
   const [customer, setCustomer] = useState<CustomerOverview | null>(null);
@@ -38,31 +38,42 @@ function BookInner() {
   const need = needMin(people);
 
   const refresh = (d: string) =>
-    listByDate(d).then(setRows).catch(() => setRows([]));
+    listBoard(d).then(setBoard).catch(() => {});
 
   useEffect(() => {
-    setRows(null);
+    setBoard(null);
     refresh(date);
   }, [date]);
 
   const roomData = useMemo(() => {
-    const map = new Map<number, { slots: number[]; busy: { start: number; end: number }[] }>();
-    if (!rows) return map;
-    for (const room of ROOMS) {
-      const timeline = buildTimeline(rows, room.id, date);
+    const map = new Map<
+      number,
+      { slots: number[]; busy: { start: number; end: number; label?: string }[] }
+    >();
+    if (!board) return map;
+    for (const room of board.rooms) {
+      const timeline = buildTimeline(board.reservations, room.id, date, {
+        open: room.open_min,
+        close: room.close_min,
+        blocks: board.blocks,
+      });
       map.set(room.id, {
         slots: slotsFor(timeline, need),
         busy: timeline
-          .filter(s => s.type === 'busy')
-          .map(s => ({ start: s.start, end: s.end })),
+          .filter(s => s.type !== 'open')
+          .map(s => ({
+            start: s.start,
+            end: s.end,
+            label: s.type === 'blocked' ? s.label : undefined,
+          })),
       });
     }
     return map;
-  }, [rows, date, need]);
+  }, [board, date, need]);
 
   // /status에서 넘어온 날짜·방·시작시각 프리필
   useEffect(() => {
-    if (prefilled || !rows) return;
+    if (prefilled || !board) return;
     setPrefilled(true);
     const room = Number(params.get('room'));
     const start = Number(params.get('start'));
@@ -71,7 +82,7 @@ function BookInner() {
     if (roomData.get(room)?.slots.includes(aligned)) {
       setSelection({ roomId: room, start: aligned });
     }
-  }, [rows, prefilled, params, roomData]);
+  }, [board, prefilled, params, roomData]);
 
   // 4자리 입력되면 즉시 조회
   useEffect(() => {
@@ -134,7 +145,9 @@ function BookInner() {
     }
   };
 
-  const selectedRoom = selection ? ROOMS.find(r => r.id === selection.roomId) : null;
+  const selectedRoom = selection && board
+    ? board.rooms.find(r => r.id === selection.roomId)
+    : null;
 
   return (
     <div>
@@ -172,9 +185,9 @@ function BookInner() {
       </div>
 
       {/* 4. 방별 시작 가능 시간 */}
-      {rows && (
+      {board && (
         <div className="mt-4 space-y-4">
-          {ROOMS.map(room => (
+          {board.rooms.map(room => (
             <SlotPicker
               key={room.id}
               roomName={room.name}

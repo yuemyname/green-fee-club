@@ -1,3 +1,20 @@
+export interface Room {
+  id: number;
+  name: string;
+  open_min: number;   // 방별 운영 시작
+  close_min: number;  // 방별 운영 종료
+}
+
+/** 예약 불가 시간 (점심시간 등) */
+export interface Block {
+  id: number;
+  room_id: number | null; // null = 모든 방
+  label: string;
+  date: string | null;    // null = 매일 반복, 아니면 yyyymmdd
+  start_min: number;
+  end_min: number;
+}
+
 /** 입금 확인 상태: 대기 / 수기 입금 확인 / 무료 예약권(포인트) 사용 */
 export type PaymentState = 'pending' | 'manual' | 'point';
 

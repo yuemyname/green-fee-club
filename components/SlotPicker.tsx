@@ -13,7 +13,7 @@ export default function SlotPicker({
 }: {
   roomName: string;
   slots: number[];
-  busy: { start: number; end: number }[];
+  busy: { start: number; end: number; label?: string }[];
   need: number;
   selected: number | null;
   onSelect: (start: number) => void;
@@ -24,14 +24,15 @@ export default function SlotPicker({
 
       {busy.length > 0 && (
         <>
-          <p className="mt-3 text-xs font-semibold text-sub">이미 예약된 시간</p>
+          <p className="mt-3 text-xs font-semibold text-sub">예약할 수 없는 시간</p>
           <div className="mt-1.5 flex flex-wrap gap-2">
             {busy.map(b => (
               <span
                 key={b.start}
-                className="inline-flex min-h-11 items-center rounded-lg bg-turf px-3 text-sm font-semibold text-sub line-through tabular-nums"
+                className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-turf px-3 text-sm font-semibold text-sub tabular-nums"
               >
-                {toHM(b.start)} – {toHM(b.end)}
+                {b.label && <b className="text-xs font-bold">{b.label}</b>}
+                <span className="line-through">{toHM(b.start)} – {toHM(b.end)}</span>
               </span>
             ))}
           </div>

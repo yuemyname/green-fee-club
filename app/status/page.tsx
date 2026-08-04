@@ -1,28 +1,24 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { listByDate } from '@/app/actions/reservation';
-import { ROOMS } from '@/lib/constants';
+import { listBoard, type Board } from '@/app/actions/reservation';
 import { buildTimeline } from '@/lib/timeline';
 import { todayStr } from '@/lib/time';
-import type { ReservationRow } from '@/lib/types';
 import DatePicker from '@/components/ui/DatePicker';
 import Eyebrow from '@/components/ui/Eyebrow';
 import RoomTimeline from '@/components/RoomTimeline';
 
 export default function StatusPage() {
   const [date, setDate] = useState(todayStr());
-  const [rows, setRows] = useState<ReservationRow[] | null>(null);
+  const [board, setBoard] = useState<Board | null>(null);
 
-  const refresh = () => listByDate(date).then(setRows).catch(() => setRows([]));
+  const refresh = () => listBoard(date).then(setBoard).catch(() => {});
 
   useEffect(() => {
     let alive = true;
-    listByDate(date).then(r => {
-      if (alive) setRows(r);
-    }).catch(() => {
-      if (alive) setRows([]);
-    });
+    listBoard(date).then(b => {
+      if (alive) setBoard(b);
+    }).catch(() => {});
     return () => {
       alive = false;
     };
@@ -39,12 +35,16 @@ export default function StatusPage() {
         <DatePicker value={date} onChange={setDate} />
       </div>
 
-      {rows && (
+      {board && (
         <div className="mt-4 space-y-4">
-          {ROOMS.map(room => (
+          {board.rooms.map(room => (
             <RoomTimeline
               key={room.id}
-              segments={buildTimeline(rows, room.id, date)}
+              segments={buildTimeline(board.reservations, room.id, date, {
+                open: room.open_min,
+                close: room.close_min,
+                blocks: board.blocks,
+              })}
               roomId={room.id}
               roomName={room.name}
               date={date}

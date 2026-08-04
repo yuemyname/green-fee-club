@@ -3,21 +3,36 @@
 import { pool } from '@/lib/server/db';
 import { STAMP_GOAL } from '@/lib/constants';
 import { needMin } from '@/lib/time';
-import type { ReservationRow } from '@/lib/types';
+import type { Block, ReservationRow, Room } from '@/lib/types';
 
-export async function listByDate(date: string): Promise<ReservationRow[]> {
-  const { rows } = await pool().query(
-    `select r.id, r.date, r.room_id, r.start_min, r.end_min, r.customer_id,
-            r.people, r.is_free, r.payment, c.name as customer_name,
-            ((select count(*) from stamps s where s.customer_id = c.id)::int / ${STAMP_GOAL}
-              - c.used_coupons) as customer_coupons
-     from reservations r
-     join customers c on c.id = r.customer_id
-     where r.date = $1
-     order by r.room_id, r.start_min`,
-    [date],
-  );
-  return rows;
+export interface Board {
+  rooms: Room[];
+  reservations: ReservationRow[];
+  blocks: Block[]; // 해당 날짜에 적용되는 예약 불가 시간 (매일 반복 포함)
+}
+
+/** 예약 현황·방 예약 화면에 필요한 하루치 데이터 */
+export async function listBoard(date: string): Promise<Board> {
+  const [rooms, reservations, blocks] = await Promise.all([
+    pool().query('select id, name, open_min, close_min from rooms order by id'),
+    pool().query(
+      `select r.id, r.date, r.room_id, r.start_min, r.end_min, r.customer_id,
+              r.people, r.is_free, r.payment, c.name as customer_name,
+              ((select count(*) from stamps s where s.customer_id = c.id)::int / ${STAMP_GOAL}
+                - c.used_coupons) as customer_coupons
+       from reservations r
+       join customers c on c.id = r.customer_id
+       where r.date = $1
+       order by r.room_id, r.start_min`,
+      [date],
+    ),
+    pool().query(
+      `select id, room_id, label, date, start_min, end_min
+       from blocks where date is null or date = $1 order by start_min`,
+      [date],
+    ),
+  ]);
+  return { rooms: rooms.rows, reservations: reservations.rows, blocks: blocks.rows };
 }
 
 export interface BookingInput {
@@ -51,6 +66,32 @@ export async function createReservation(
       return { ok: false, error: '등록되지 않은 번호입니다. 고객 등록에서 먼저 추가해 주세요.' };
     }
     const c = cust.rows[0];
+
+    const room = await client.query(
+      'select open_min, close_min from rooms where id = $1',
+      [input.room_id],
+    );
+    if (!room.rows.length) {
+      await client.query('rollback');
+      return { ok: false, error: '방을 찾을 수 없습니다.' };
+    }
+    if (input.start_min < room.rows[0].open_min || end > room.rows[0].close_min) {
+      await client.query('rollback');
+      return { ok: false, error: '운영시간을 벗어난 시간입니다. 시간을 다시 골라주세요.' };
+    }
+
+    const blocked = await client.query(
+      `select 1 from blocks
+       where (room_id is null or room_id = $1)
+         and (date is null or date = $2)
+         and start_min < $3 and $4 < end_min
+       limit 1`,
+      [input.room_id, input.date, end, input.start_min],
+    );
+    if (blocked.rows.length) {
+      await client.query('rollback');
+      return { ok: false, error: '예약 불가 시간과 겹칩니다. 시간을 다시 골라주세요.' };
+    }
 
     const overlap = await client.query(
       `select 1 from reservations
