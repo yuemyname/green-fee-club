@@ -7,46 +7,46 @@
 
 ```bash
 npm install
-npm run dev     # http://localhost:3000
-npm test        # lib 단위 테스트 (vitest)
-npm run build   # 프로덕션 빌드
+export DATABASE_URL=postgres://user:pass@localhost:5432/greenround
+npm run db:migrate   # 스키마 적용 + (비어있으면) 시드
+npm run dev          # http://localhost:3000
+npm test             # lib 단위 테스트 (vitest)
 ```
 
-로그인 코드는 `OWNER_CODE` 환경변수(기본 `1406`).
+환경변수:
 
-## 현재 단계 — 1단계 (DB 없이)
-
-- 데이터는 브라우저 `localStorage`(`greenround:v1`)에 저장되고, 첫 실행 시 시드 데이터가 들어갑니다.
-- 인증은 클라이언트가 발급하는 쿠키 `gr_session`(7일)을 서버 배포에선 `middleware.ts`가, 정적 배포에선 `AuthGuard`가 검사합니다.
-- 2단계에서 Supabase(Postgres)로 CRUD를 옮기고, 인증을 Server Action + httpOnly 쿠키로 되돌리고, 예약 겹침 검사를 DB 트랜잭션으로 이동합니다. 스키마는 `SPEC.md` 3-2 참고.
-
-## GitHub Pages 배포
-
-푸시하면 `.github/workflows/pages.yml`이 정적 내보내기(`STATIC_EXPORT=1`, basePath `/green-fee-club`)로 빌드해 Pages에 배포합니다.
-저장소 **Settings → Pages → Source**를 **GitHub Actions**로 한 번만 설정하면 됩니다.
-주소: `https://<owner>.github.io/green-fee-club/`
-
-## 화면
-
-| 라우트 | 설명 |
+| 이름 | 설명 |
 |---|---|
-| `/login` | 사장님 전화번호 뒤 4자리 로그인 |
-| `/` | 메뉴 + 무료 예약권 보유 고객 목록 |
-| `/book` | 인원·날짜 → 방별 시작 가능 시간 칩 → 예약 확정 (무료 예약권 토글) |
-| `/status` | 방별 하루 타임라인, 빈 구간 클릭 시 `/book` 프리필 |
-| `/point` | 뒤 4자리로 조회+적립 한 번에, 스탬프 카드 표시 |
-| `/customer` | 고객 등록 + 목록 |
+| `DATABASE_URL` | Postgres 연결 문자열 (필수) |
+| `OWNER_CODE` | 로그인 코드, 기본 `1406` |
+
+## Railway 배포
+
+1. Railway에서 이 저장소로 서비스 생성 (Next.js 자동 감지)
+2. 같은 프로젝트에 **Postgres** 추가
+3. 앱 서비스 Variables에 `DATABASE_URL` = `${{Postgres.DATABASE_URL}}` 참조 추가 (+ 필요 시 `OWNER_CODE`)
+4. 배포 — `railway.json`의 `preDeployCommand`가 마이그레이션+시드를 자동 실행
+
+## 현재 단계 — 2단계 (Postgres)
+
+- 인증: Server Action이 발급하는 httpOnly 쿠키 `gr_session`(7일)을 `middleware.ts`가 검사
+- CRUD 전부 Server Actions (`app/actions/`), 예약 겹침 검사는 DB 트랜잭션에서
+  `pg_advisory_xact_lock`으로 방·날짜 단위 직렬화 후 수행
+- 스키마: `db/schema.sql` (SPEC 3-2), 시드: `scripts/migrate.mjs`
 
 ## 구조
 
 ```
-app/                  # 라우트 (전부 클라이언트 페이지) + actions/auth.ts
+app/                  # 라우트 (클라이언트 페이지)
+  actions/            # auth, customer(적립 포함), reservation — Server Actions
 components/ui/        # Btn, Field, Card, Eyebrow, Toast, DatePicker
 components/           # StampCard, RoomTimeline, SlotPicker, Header
+db/schema.sql         # 테이블 정의
+scripts/migrate.mjs   # 마이그레이션 + 시드
 lib/
   constants.ts        # OPEN/CLOSE/ROOMS 등
   time.ts             # toHM, fmtDur, fmtDate, shiftDate, needMin
   timeline.ts         # buildTimeline, slotsFor
-  db.ts               # localStorage 스토어 + 도메인 로직 (1단계)
+  server/db.ts        # pg Pool
 middleware.ts         # gr_session 쿠키 검사
 ```

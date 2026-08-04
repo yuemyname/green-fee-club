@@ -1,17 +1,21 @@
 import { OPEN, CLOSE } from './constants';
 import type { Reservation } from './types';
 
-export type Segment =
+export type Segment<R extends Reservation = Reservation> =
   | { type: 'open'; start: number; end: number }
-  | { type: 'busy'; start: number; end: number; res: Reservation };
+  | { type: 'busy'; start: number; end: number; res: R };
 
 /** 하루(08:00~24:00)를 빈 구간/예약 구간 세그먼트로 빈틈없이 채운다 */
-export function buildTimeline(reservations: Reservation[], roomId: number, date: string): Segment[] {
+export function buildTimeline<R extends Reservation>(
+  reservations: R[],
+  roomId: number,
+  date: string,
+): Segment<R>[] {
   const list = reservations
     .filter(r => r.room_id === roomId && r.date === date)
     .sort((a, b) => a.start_min - b.start_min);
 
-  const segs: Segment[] = [];
+  const segs: Segment<R>[] = [];
   let cur = OPEN;
   for (const r of list) {
     if (r.start_min > cur) segs.push({ type: 'open', start: cur, end: r.start_min });

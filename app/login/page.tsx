@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { login } from '@/lib/auth';
+import { login } from '@/app/actions/auth';
 import Btn from '@/components/ui/Btn';
 import Eyebrow from '@/components/ui/Eyebrow';
 import { useToast } from '@/components/ui/Toast';
@@ -13,10 +13,11 @@ export default function LoginPage() {
   const router = useRouter();
   const toast = useToast();
 
-  const submit = () => {
+  const submit = async () => {
     if (code.length !== 4 || busy) return;
     setBusy(true);
-    if (login(code)) {
+    const res = await login(code);
+    if (res.ok) {
       router.replace('/');
     } else {
       toast('번호가 맞지 않습니다. 뒤 4자리를 다시 확인해 주세요.');

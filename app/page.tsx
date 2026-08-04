@@ -1,7 +1,9 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { coupons, useDB } from '@/lib/db';
+import { listCustomers } from '@/app/actions/customer';
+import type { CustomerOverview } from '@/lib/types';
 import Eyebrow from '@/components/ui/Eyebrow';
 import Card from '@/components/ui/Card';
 
@@ -13,12 +15,13 @@ const MENUS = [
 ];
 
 export default function MenuPage() {
-  const db = useDB();
-  const holders = db
-    ? db.customers
-        .map(c => ({ c, n: coupons(db, c) }))
-        .filter(x => x.n > 0)
-    : [];
+  const [customers, setCustomers] = useState<CustomerOverview[] | null>(null);
+
+  useEffect(() => {
+    listCustomers().then(setCustomers).catch(() => setCustomers([]));
+  }, []);
+
+  const holders = customers?.filter(c => c.coupons > 0) ?? [];
 
   return (
     <div>
@@ -43,18 +46,18 @@ export default function MenuPage() {
       <section className="mt-8">
         <h2 className="text-sm font-bold text-deep">무료 예약권 보유 고객</h2>
         <div className="mt-2 space-y-2">
-          {db && holders.length === 0 && (
+          {customers && holders.length === 0 && (
             <Card>
               <p className="text-sm text-sub">아직 카드를 채운 고객이 없습니다.</p>
             </Card>
           )}
-          {holders.map(({ c, n }) => (
+          {holders.map(c => (
             <Card key={c.id} className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-bold">{c.name}</p>
                 <p className="mt-0.5 text-xs text-sub tabular-nums">{c.phone}</p>
               </div>
-              <span className="text-sm font-black text-flag tabular-nums">무료 {n}회</span>
+              <span className="text-sm font-black text-flag tabular-nums">무료 {c.coupons}회</span>
             </Card>
           ))}
         </div>

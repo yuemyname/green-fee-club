@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
-import AuthGuard from '@/components/AuthGuard';
 import Header from '@/components/Header';
 import { ToastProvider } from '@/components/ui/Toast';
 
@@ -25,10 +24,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="min-h-dvh antialiased">
         <ToastProvider>
-          <AuthGuard>
-            <Header />
-            <main className="mx-auto max-w-xl px-4 py-6 pb-24">{children}</main>
-          </AuthGuard>
+          <Header />
+          <main className="mx-auto max-w-xl px-4 py-6 pb-24">{children}</main>
         </ToastProvider>
       </body>
     </html>

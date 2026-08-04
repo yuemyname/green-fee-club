@@ -1,17 +1,30 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { listByDate } from '@/app/actions/reservation';
 import { ROOMS } from '@/lib/constants';
 import { buildTimeline } from '@/lib/timeline';
 import { todayStr } from '@/lib/time';
-import { useDB } from '@/lib/db';
+import type { ReservationRow } from '@/lib/types';
 import DatePicker from '@/components/ui/DatePicker';
 import Eyebrow from '@/components/ui/Eyebrow';
 import RoomTimeline from '@/components/RoomTimeline';
 
 export default function StatusPage() {
-  const db = useDB();
   const [date, setDate] = useState(todayStr());
+  const [rows, setRows] = useState<ReservationRow[] | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    listByDate(date).then(r => {
+      if (alive) setRows(r);
+    }).catch(() => {
+      if (alive) setRows([]);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [date]);
 
   return (
     <div>
@@ -24,13 +37,12 @@ export default function StatusPage() {
         <DatePicker value={date} onChange={setDate} />
       </div>
 
-      {db && (
+      {rows && (
         <div className="mt-4 space-y-4">
           {ROOMS.map(room => (
             <RoomTimeline
               key={room.id}
-              db={db}
-              segments={buildTimeline(db.reservations, room.id, date)}
+              segments={buildTimeline(rows, room.id, date)}
               roomId={room.id}
               roomName={room.name}
               date={date}

@@ -12,7 +12,6 @@ const res = (room_id: number, date: string, start_min: number, end_min: number):
   customer_id: 1,
   people: 1,
   is_free: false,
-  created_at: '',
 });
 
 describe('buildTimeline', () => {

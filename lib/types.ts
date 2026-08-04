@@ -1,19 +1,3 @@
-export interface Customer {
-  id: number;
-  name: string;
-  phone: string;        // 010-5397-1406
-  last4: string;        // 조회 키
-  used_coupons: number; // 사용한 무료 예약권 수
-  created_at: string;
-}
-
-export interface Stamp {
-  id: number;
-  customer_id: number;
-  date: string;         // yyyymmdd
-  created_at: string;
-}
-
 export interface Reservation {
   id: number;
   date: string;         // yyyymmdd
@@ -23,12 +7,20 @@ export interface Reservation {
   customer_id: number;
   people: number;
   is_free: boolean;
-  created_at: string;
 }
 
-export interface DB {
-  customers: Customer[];
-  stamps: Stamp[];
-  reservations: Reservation[];
-  seq: number;
+/** 현황/타임라인 표시용 — 고객 이름 포함 */
+export interface ReservationRow extends Reservation {
+  customer_name: string;
+}
+
+/** 고객 + 파생 값 (도장 수·쿠폰) */
+export interface CustomerOverview {
+  id: number;
+  name: string;
+  phone: string;        // 010-5397-1406
+  last4: string;
+  totalStamps: number;
+  progress: number;     // 현재 카드에 찍힌 개수 (totalStamps % 10)
+  coupons: number;      // 사용 가능한 무료 예약권
 }

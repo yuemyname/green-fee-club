@@ -3,18 +3,16 @@
 import { useRouter } from 'next/navigation';
 import type { Segment } from '@/lib/timeline';
 import { fmtDur, toHM } from '@/lib/time';
-import type { DB } from '@/lib/types';
+import type { ReservationRow } from '@/lib/types';
 
 /** 하루 타임라인을 세그먼트 리스트로. 빈 구간 클릭 시 /book 프리필 이동 */
 export default function RoomTimeline({
-  db,
   segments,
   roomId,
   roomName,
   date,
 }: {
-  db: DB;
-  segments: Segment[];
+  segments: Segment<ReservationRow>[];
   roomId: number;
   roomName: string;
   date: string;
@@ -44,7 +42,6 @@ export default function RoomTimeline({
               </button>
             );
           }
-          const customer = db.customers.find(c => c.id === seg.res.customer_id);
           return (
             <div
               key={seg.start}
@@ -52,7 +49,7 @@ export default function RoomTimeline({
             >
               <span className="text-sm font-semibold tabular-nums">{range}</span>
               <span className="flex items-center gap-1.5 text-xs font-semibold text-sub tabular-nums">
-                {customer?.name} {seg.res.people}명
+                {seg.res.customer_name} {seg.res.people}명
                 {seg.res.is_free && (
                   <span className="rounded-md bg-flag px-1.5 py-0.5 text-[11px] font-bold text-white">
                     무료
