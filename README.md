@@ -27,26 +27,30 @@ npm test             # lib 단위 테스트 (vitest)
 3. 앱 서비스 Variables에 `DATABASE_URL` = `${{Postgres.DATABASE_URL}}` 참조 추가 (+ 필요 시 `OWNER_CODE`)
 4. 배포 — `railway.json`의 `preDeployCommand`가 마이그레이션+시드를 자동 실행
 
-## 현재 단계 — 2단계 (Postgres)
+## 현재 단계 — 2단계 (Postgres) + 확장
 
 - 인증: Server Action이 발급하는 httpOnly 쿠키 `gr_session`(7일)을 `middleware.ts`가 검사
 - CRUD 전부 Server Actions (`app/actions/`), 예약 겹침 검사는 DB 트랜잭션에서
   `pg_advisory_xact_lock`으로 방·날짜 단위 직렬화 후 수행
-- 스키마: `db/schema.sql` (SPEC 3-2), 시드: `scripts/migrate.mjs`
+- 예약 입금 확인: 예약은 `입금 대기`로 생성 → 현황에서 수기 확인(도장 적립) 또는
+  포인트 사용(무료 예약권 차감) 처리
+- 방 관리(`/rooms`): 방 추가/수정/삭제, 방별 운영시간, 예약 불가 시간
+  (라벨·대상 방·매일 반복/특정 날짜)
+- 스키마: `db/schema.sql`, 시드·백필: `scripts/migrate.mjs`
 
 ## 구조
 
 ```
 app/                  # 라우트 (클라이언트 페이지)
-  actions/            # auth, customer(적립 포함), reservation — Server Actions
+  actions/            # auth, customer(적립 포함), reservation, room — Server Actions
 components/ui/        # Btn, Field, Card, Eyebrow, Toast, DatePicker
 components/           # StampCard, RoomTimeline, SlotPicker, Header
 db/schema.sql         # 테이블 정의
 scripts/migrate.mjs   # 마이그레이션 + 시드
 lib/
-  constants.ts        # OPEN/CLOSE/ROOMS 등
+  constants.ts        # OPEN/CLOSE 기본값, 1인당 시간 등
   time.ts             # toHM, fmtDur, fmtDate, shiftDate, needMin
-  timeline.ts         # buildTimeline, slotsFor
+  timeline.ts         # buildTimeline(운영시간·불가 구간 반영), slotsFor
   server/db.ts        # pg Pool
 middleware.ts         # gr_session 쿠키 검사
 ```
