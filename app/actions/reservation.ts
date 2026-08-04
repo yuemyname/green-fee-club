@@ -37,6 +37,17 @@ export async function listBoard(date: string): Promise<Board> {
   return { rooms: rooms.rows, reservations: reservations.rows, blocks: blocks.rows };
 }
 
+/** 해당 월(yyyymm)에서 예약이 1건이라도 있는 날짜 목록 */
+export async function monthReservedDates(month: string): Promise<string[]> {
+  if (!(await isOwner())) throw new Error('UNAUTHORIZED');
+  if (!/^\d{6}$/.test(month)) return [];
+  const { rows } = await pool().query(
+    `select distinct date from reservations where date >= $1 || '01' and date <= $1 || '31'`,
+    [month],
+  );
+  return rows.map(r => r.date);
+}
+
 export interface BookingInput {
   date: string;
   room_id: number;

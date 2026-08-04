@@ -1,18 +1,30 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { listBoard, type Board } from '@/app/actions/reservation';
+import { listBoard, monthReservedDates, type Board } from '@/app/actions/reservation';
 import { buildTimeline } from '@/lib/timeline';
-import { todayStr } from '@/lib/time';
-import DatePicker from '@/components/ui/DatePicker';
+import { fmtDate, todayStr } from '@/lib/time';
 import Eyebrow from '@/components/ui/Eyebrow';
+import MonthCalendar from '@/components/MonthCalendar';
 import RoomTimeline from '@/components/RoomTimeline';
 
 export default function StatusPage() {
   const [date, setDate] = useState(todayStr());
+  const [month, setMonth] = useState(todayStr().slice(0, 6));
+  const [marks, setMarks] = useState<Set<string>>(new Set());
   const [board, setBoard] = useState<Board | null>(null);
 
   const refresh = () => listBoard(date).then(setBoard).catch(() => {});
+
+  useEffect(() => {
+    let alive = true;
+    monthReservedDates(month).then(d => {
+      if (alive) setMarks(new Set(d));
+    }).catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [month]);
 
   useEffect(() => {
     let alive = true;
@@ -32,11 +44,18 @@ export default function StatusPage() {
       </h1>
 
       <div className="mt-5">
-        <DatePicker value={date} onChange={setDate} />
+        <MonthCalendar
+          month={month}
+          value={date}
+          marked={marks}
+          onSelect={setDate}
+          onMonthChange={setMonth}
+        />
       </div>
 
+      <h2 className="mt-6 text-sm font-bold text-deep tabular-nums">{fmtDate(date)} 예약 상세</h2>
       {board && (
-        <div className="mt-4 space-y-4">
+        <div className="mt-2 space-y-4">
           {board.rooms.map(room => (
             <RoomTimeline
               key={room.id}
