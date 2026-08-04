@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { addStamp, type StampResult } from '@/app/actions/customer';
 import { STAMP_GOAL } from '@/lib/constants';
-import { todayStr } from '@/lib/time';
+import { fmtDate, toHM, todayStr } from '@/lib/time';
+import type { CouponState } from '@/components/StampCard';
 import Btn from '@/components/ui/Btn';
 import Card from '@/components/ui/Card';
 import Eyebrow from '@/components/ui/Eyebrow';
@@ -51,6 +52,21 @@ export default function PointPage() {
   }
   const remain = cards.length ? STAMP_GOAL - cards[cards.length - 1].length : 0;
 
+  // 꽉 찬 카드 = 무료 예약권 1장. 오래된 카드부터 사용된 것으로 매칭한다.
+  const usedCount = result
+    ? Math.floor(result.customer.totalStamps / STAMP_GOAL) - result.customer.coupons
+    : 0;
+  const couponState = (fullCardIndex: number): CouponState => {
+    if (fullCardIndex >= usedCount) return { used: false };
+    const u = result?.couponUses[fullCardIndex];
+    return {
+      used: true,
+      info: u
+        ? `${fmtDate(u.date)} · ${u.room_name ?? ''} ${toHM(u.start_min)}–${toHM(u.end_min)} 예약에 사용`
+        : '',
+    };
+  };
+
   return (
     <div>
       <Eyebrow>POINT</Eyebrow>
@@ -92,6 +108,7 @@ export default function PointPage() {
               <StampCard
                 key={i}
                 dates={cardDates}
+                coupon={cardDates.length >= STAMP_GOAL ? couponState(i) : undefined}
                 footer={
                   i === cards.length - 1 ? (
                     <p className="text-xs font-semibold text-sub tabular-nums">

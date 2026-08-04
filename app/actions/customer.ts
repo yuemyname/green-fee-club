@@ -2,7 +2,7 @@
 
 import { pool } from '@/lib/server/db';
 import { STAMP_GOAL } from '@/lib/constants';
-import type { CustomerOverview } from '@/lib/types';
+import type { CouponUse, CustomerOverview } from '@/lib/types';
 
 const OVERVIEW_SQL = `
   select c.id, c.name, c.phone, c.last4, c.used_coupons,
@@ -73,9 +73,10 @@ export async function createCustomer(
 
 export interface StampResult {
   customer: CustomerOverview;
-  stampDates: string[];   // 시간순 전체 도장 날짜 (yyyymmdd)
+  stampDates: string[];      // 시간순 전체 도장 날짜 (yyyymmdd)
+  couponUses: CouponUse[];   // 무료 예약권 사용 내역 (사용 순)
   cardCompleted: boolean;
-  progress: number;       // 도장 후 현재 카드 칸 수 (10개째면 10)
+  progress: number;          // 도장 후 현재 카드 칸 수 (10개째면 10)
 }
 
 export async function addStamp(
@@ -103,6 +104,14 @@ export async function addStamp(
       'select date from stamps where customer_id = $1 order by created_at, id',
       [id],
     );
+    const uses = await client.query(
+      `select r.date, r.start_min, r.end_min, rm.name as room_name
+       from reservations r
+       left join rooms rm on rm.id = r.room_id
+       where r.customer_id = $1 and r.payment = 'point'
+       order by r.paid_at nulls first, r.id`,
+      [id],
+    );
     await client.query('commit');
 
     const customer = toOverview(rows[0]);
@@ -112,6 +121,7 @@ export async function addStamp(
       value: {
         customer,
         stampDates: dates.rows.map(r => r.date),
+        couponUses: uses.rows,
         cardCompleted: completed,
         progress: completed ? STAMP_GOAL : customer.progress,
       },

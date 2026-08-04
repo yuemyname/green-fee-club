@@ -69,9 +69,9 @@ try {
       return id;
     };
 
-    const c1 = await seed('정승우', '01053971406', 17); // 쿠폰 1장 + 진행 7칸
+    const c1 = await seed('정승우', '01053971406', 17);    // 쿠폰 1장 + 진행 7칸
     const c2 = await seed('김민지', '01041127788', 7);
-    const c3 = await seed('박도윤', '01098305522', 10); // 쿠폰 1장
+    const c3 = await seed('박도윤', '01098305522', 20, 1); // 쿠폰 2장 중 1장 사용(아래 무료 예약)
     await seed('이서연', '01026743314', 3);
 
     const today = daysAgo(0);

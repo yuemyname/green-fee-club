@@ -15,6 +15,14 @@ export interface Block {
   end_min: number;
 }
 
+/** 무료 예약권 사용 내역 — 어떤 예약에 쓰였는지 */
+export interface CouponUse {
+  date: string;             // 예약 날짜 yyyymmdd
+  start_min: number;
+  end_min: number;
+  room_name: string | null;
+}
+
 /** 입금 확인 상태: 대기 / 수기 입금 확인 / 무료 예약권(포인트) 사용 */
 export type PaymentState = 'pending' | 'manual' | 'point';
 
