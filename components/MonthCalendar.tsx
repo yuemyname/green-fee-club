@@ -8,15 +8,15 @@ const DOW = ['일', '월', '화', '수', '목', '금', '토'];
  * 월 달력 — 예약이 있는 날짜는 초록 동그라미(marked), 선택한 날짜는 진한 테두리.
  */
 export default function MonthCalendar({
-  month,          // yyyymm
-  value,          // 선택된 yyyymmdd
-  marked,         // 예약이 있는 yyyymmdd 집합
+  month,                    // yyyymm
+  value,                    // 선택된 yyyymmdd
+  marked = new Set<string>(), // 예약이 있는 yyyymmdd 집합 (없으면 순수 날짜 선택기)
   onSelect,
   onMonthChange,
 }: {
   month: string;
   value: string;
-  marked: Set<string>;
+  marked?: Set<string>;
   onSelect: (date: string) => void;
   onMonthChange: (month: string) => void;
 }) {
@@ -87,9 +87,11 @@ export default function MonthCalendar({
         })}
       </div>
 
-      <p className="mt-1 flex items-center gap-1.5 text-[11px] text-sub">
-        <span className="inline-block size-2.5 rounded-full bg-fair" /> 예약 있는 날 — 누르면 아래에 상세가 열립니다
-      </p>
+      {marked.size > 0 && (
+        <p className="mt-1 flex items-center gap-1.5 text-[11px] text-sub">
+          <span className="inline-block size-2.5 rounded-full bg-fair" /> 예약 있는 날 — 누르면 아래에 상세가 열립니다
+        </p>
+      )}
     </div>
   );
 }
