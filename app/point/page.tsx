@@ -1,7 +1,9 @@
 'use client';
 
-import { useState } from 'react';
-import { addStamp, type StampResult } from '@/app/actions/customer';
+import { useEffect, useState } from 'react';
+import {
+  addStamp, getCustomerDetail, type CustomerDetail,
+} from '@/app/actions/customer';
 import { STAMP_GOAL } from '@/lib/constants';
 import { fmtDate, toHM, todayStr } from '@/lib/time';
 import type { CouponState } from '@/components/StampCard';
@@ -15,23 +17,38 @@ export default function PointPage() {
   const toast = useToast();
   const [last4, setLast4] = useState('');
   const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState<StampResult | null>(null);
+  const [detail, setDetail] = useState<CustomerDetail | null>(null);
   const [notFound, setNotFound] = useState(false);
 
-  const submit = async () => {
-    if (last4.length !== 4 || busy) return;
+  // 4자리 입력되면 적립 전에 현재 포인트를 먼저 조회해 보여준다
+  useEffect(() => {
+    if (last4.length !== 4) {
+      setDetail(null);
+      setNotFound(false);
+      return;
+    }
+    let alive = true;
+    getCustomerDetail(last4).then(d => {
+      if (!alive) return;
+      setDetail(d);
+      setNotFound(d === null);
+    }).catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [last4]);
+
+  const stamp = async () => {
+    if (!detail || busy) return;
     setBusy(true);
     try {
       const res = await addStamp(last4, todayStr());
       if (!res.ok) {
         toast(res.error);
-        setResult(null);
-        setNotFound(true);
         return;
       }
-      setNotFound(false);
-      setResult(res.value);
-      const { customer, progress, cardCompleted } = res.value;
+      const { customer, stampDates, couponUses, progress, cardCompleted } = res.value;
+      setDetail({ customer, stampDates, couponUses });
       toast(
         cardCompleted
           ? `카드 완성! ${customer.name}님 무료 예약권 1장이 나왔습니다.`
@@ -44,21 +61,20 @@ export default function PointPage() {
 
   // 10개 단위로 카드 분할. 마지막이 꽉 찼으면 새 빈 카드를 하나 더 붙인다.
   const cards: string[][] = [];
-  if (result) {
-    for (let i = 0; i < result.stampDates.length; i += STAMP_GOAL) {
-      cards.push(result.stampDates.slice(i, i + STAMP_GOAL));
+  if (detail) {
+    for (let i = 0; i < detail.stampDates.length; i += STAMP_GOAL) {
+      cards.push(detail.stampDates.slice(i, i + STAMP_GOAL));
     }
     if (cards.length === 0 || cards[cards.length - 1].length === STAMP_GOAL) cards.push([]);
   }
   const remain = cards.length ? STAMP_GOAL - cards[cards.length - 1].length : 0;
 
-  // 꽉 찬 카드 = 무료 예약권 1장. 오래된 카드부터 사용된 것으로 매칭한다.
-  const usedCount = result
-    ? Math.floor(result.customer.totalStamps / STAMP_GOAL) - result.customer.coupons
+  const usedCount = detail
+    ? Math.floor(detail.customer.totalStamps / STAMP_GOAL) - detail.customer.coupons
     : 0;
-  const couponState = (fullCardIndex: number): CouponState => {
-    if (fullCardIndex >= usedCount) return { used: false };
-    const u = result?.couponUses[fullCardIndex];
+  const couponState = (i: number): CouponState => {
+    if (i >= usedCount) return { used: false };
+    const u = detail?.couponUses[i];
     return {
       used: true,
       info: u
@@ -73,7 +89,9 @@ export default function PointPage() {
       <h1 className="mt-1 text-2xl font-black text-deep" style={{ letterSpacing: '-0.02em' }}>
         포인트 적립
       </h1>
-      <p className="mt-2 text-sm text-sub">번호만 넣으면 무조건 도장이 1개 찍힙니다.</p>
+      <p className="mt-2 text-sm text-sub">
+        번호를 입력하면 현재 포인트가 먼저 조회되고, 적립 버튼을 눌러야 도장이 찍힙니다.
+      </p>
 
       <div className="mt-5 flex gap-2">
         <input
@@ -82,25 +100,30 @@ export default function PointPage() {
           maxLength={4}
           value={last4}
           onChange={e => setLast4(e.target.value.replace(/\D/g, ''))}
-          onKeyDown={e => e.key === 'Enter' && submit()}
+          onKeyDown={e => e.key === 'Enter' && stamp()}
           placeholder="뒤 4자리"
           className="h-12 flex-1 rounded-lg border border-line bg-white px-4 text-center text-xl font-bold tracking-widest tabular-nums outline-none placeholder:text-base placeholder:font-normal placeholder:tracking-normal placeholder:text-sub focus:border-fair"
         />
-        <Btn onClick={submit} disabled={last4.length !== 4 || busy} className="px-6">
+        <Btn onClick={stamp} disabled={!detail || busy} className="px-6">
           적립
         </Btn>
       </div>
 
-      {result && (
+      {detail && (
         <div className="mt-6">
           <Card className="flex items-center justify-between bg-turf">
             <div>
-              <p className="text-lg font-black text-deep">{result.customer.name}</p>
-              <p className="mt-0.5 text-sm text-sub tabular-nums">{result.customer.phone}</p>
+              <p className="text-lg font-black text-deep">{detail.customer.name}</p>
+              <p className="mt-0.5 text-sm text-sub tabular-nums">{detail.customer.phone}</p>
             </div>
-            <p className="text-sm font-black text-flag tabular-nums">
-              무료 예약권 {result.customer.coupons}회
-            </p>
+            <div className="text-right">
+              <p className="text-sm font-bold text-fair tabular-nums">
+                도장 {detail.customer.progress}/{STAMP_GOAL}
+              </p>
+              <p className="mt-0.5 text-sm font-black text-flag tabular-nums">
+                무료 예약권 {detail.customer.coupons}회
+              </p>
+            </div>
           </Card>
 
           <div className="mt-4 grid gap-3 sm:grid-cols-2">

@@ -75,6 +75,42 @@ export async function createCustomer(
   }
 }
 
+export interface CustomerDetail {
+  customer: CustomerOverview;
+  stampDates: string[];
+  couponUses: CouponUse[];
+}
+
+/** 적립 전 현재 포인트 조회 — 도장을 찍지 않는다 */
+export async function getCustomerDetail(last4: string): Promise<CustomerDetail | null> {
+  if (!(await isOwner())) throw new Error('UNAUTHORIZED');
+  const { rows } = await pool().query(
+    `${OVERVIEW_SQL} where c.last4 = $1 group by c.id`,
+    [last4],
+  );
+  if (!rows.length) return null;
+  const customer = toOverview(rows[0]);
+  const [dates, uses] = await Promise.all([
+    pool().query(
+      'select date from stamps where customer_id = $1 order by created_at, id',
+      [customer.id],
+    ),
+    pool().query(
+      `select r.date, r.start_min, r.end_min, rm.name as room_name
+       from reservations r
+       left join rooms rm on rm.id = r.room_id
+       where r.customer_id = $1 and r.payment = 'point'
+       order by r.paid_at nulls first, r.id`,
+      [customer.id],
+    ),
+  ]);
+  return {
+    customer,
+    stampDates: dates.rows.map(r => r.date),
+    couponUses: uses.rows,
+  };
+}
+
 export interface StampResult {
   customer: CustomerOverview;
   stampDates: string[];      // 시간순 전체 도장 날짜 (yyyymmdd)
