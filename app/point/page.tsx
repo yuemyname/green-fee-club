@@ -2,8 +2,10 @@
 
 import { useState } from 'react';
 import {
-  addStamp, getCustomerDetail, type CustomerDetail,
+  addStamp, findCustomersByLast4, getCustomerDetailById, type CustomerDetail,
 } from '@/app/actions/customer';
+import type { CustomerOverview } from '@/lib/types';
+import CustomerPicker from '@/components/CustomerPicker';
 import { STAMP_GOAL } from '@/lib/constants';
 import { fmtDate, toHM, todayStr } from '@/lib/time';
 import type { CouponState } from '@/components/StampCard';
@@ -20,23 +22,38 @@ export default function PointPage() {
   const [detail, setDetail] = useState<CustomerDetail | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [looked, setLooked] = useState(false); // 현재 번호로 조회를 마쳤는지
+  const [picker, setPicker] = useState<CustomerOverview[] | null>(null);
 
   const changeLast4 = (v: string) => {
     setLast4(v.replace(/\D/g, ''));
     setDetail(null);
     setNotFound(false);
     setLooked(false);
+    setPicker(null);
   };
 
-  // 조회 — 도장을 찍지 않고 현재 포인트만 보여준다
+  const loadDetail = async (id: number) => {
+    const d = await getCustomerDetailById(id);
+    setDetail(d);
+    setNotFound(d === null);
+    setLooked(true);
+  };
+
+  // 조회 — 도장을 찍지 않고 현재 포인트만 보여준다.
+  // 같은 뒤 4자리 고객이 여러 명이면 선택 팝업을 띄운다.
   const lookup = async () => {
     if (last4.length !== 4 || looked || busy) return;
     setBusy(true);
     try {
-      const d = await getCustomerDetail(last4);
-      setDetail(d);
-      setNotFound(d === null);
-      setLooked(true);
+      const list = await findCustomersByLast4(last4);
+      if (list.length === 0) {
+        setNotFound(true);
+        setLooked(true);
+      } else if (list.length === 1) {
+        await loadDetail(list[0].id);
+      } else {
+        setPicker(list);
+      }
     } finally {
       setBusy(false);
     }
@@ -46,7 +63,7 @@ export default function PointPage() {
     if (!detail || busy) return;
     setBusy(true);
     try {
-      const res = await addStamp(last4, todayStr());
+      const res = await addStamp(detail.customer.id, todayStr());
       if (!res.ok) {
         toast(res.error);
         return;
@@ -150,6 +167,17 @@ export default function PointPage() {
             ))}
           </div>
         </div>
+      )}
+      {picker && (
+        <CustomerPicker
+          candidates={picker}
+          onPick={c => {
+            setPicker(null);
+            setBusy(true);
+            loadDetail(c.id).finally(() => setBusy(false));
+          }}
+          onClose={() => setPicker(null)}
+        />
       )}
       {notFound && (
         <p className="mt-4 text-sm font-semibold text-flag">

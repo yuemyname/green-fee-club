@@ -16,8 +16,8 @@ export function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  // 사장님용 화면
-  const authed = req.cookies.get('gr_session')?.value === 'owner';
+  // 관리자용 화면 — 쿠키 존재만 확인 (서명 검증은 서버 액션에서)
+  const authed = Boolean(req.cookies.get('gr_session')?.value);
   const isLogin = path === '/login';
   if (!authed && !isLogin) {
     return NextResponse.redirect(new URL('/login', req.url));

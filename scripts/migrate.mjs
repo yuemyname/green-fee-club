@@ -2,6 +2,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { randomBytes, scryptSync } from 'node:crypto';
 import pg from 'pg';
 
 const url = process.env.DATABASE_URL;
@@ -41,6 +42,22 @@ try {
            paid_at = created_at`,
     );
     console.log('payment 컬럼 추가 + 기존 예약 백필 완료');
+  }
+
+  // 기존 DB의 last4 unique 제약 제거 — 뒤 4자리가 같은 고객 등록 허용
+  await client.query('alter table customers drop constraint if exists customers_last4_key');
+
+  // 관리자가 없으면 초기 계정 생성 (ADMIN_USERNAME/ADMIN_PASSWORD, 기본 admin / OWNER_CODE)
+  const adminCount = await client.query('select count(*)::int as n from admins');
+  if (!adminCount.rows[0].n) {
+    const username = process.env.ADMIN_USERNAME ?? 'admin';
+    const password = process.env.ADMIN_PASSWORD ?? process.env.OWNER_CODE ?? '1406';
+    const salt = randomBytes(16).toString('hex');
+    const hash = scryptSync(password, salt, 32).toString('hex');
+    await client.query('insert into admins (username, password_hash) values ($1,$2)', [
+      username, `${salt}:${hash}`,
+    ]);
+    console.log(`초기 관리자 생성: ${username}`);
   }
 
   // 방이 없으면 기본 2개를 등록 (기존 예약의 room_id 1·2와 맞춤)

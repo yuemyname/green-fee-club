@@ -1,11 +1,20 @@
+create table if not exists admins (
+  id            bigserial primary key,
+  username      text not null unique,
+  password_hash text not null,           -- scrypt salt:hash
+  created_at    timestamptz default now()
+);
+
 create table if not exists customers (
   id          bigserial primary key,
   name        text not null,
-  phone       text not null,            -- 010-5397-1406
-  last4       text not null unique,     -- 로그인/조회 키
+  phone       text not null,            -- 010-5397-1406 (전체 번호가 고유 식별자)
+  last4       text not null,            -- 조회 키 (중복 허용)
   used_coupons int not null default 0,  -- 사용한 무료 예약권 수
   created_at  timestamptz default now()
 );
+
+create index if not exists customers_last4_idx on customers (last4);
 
 create table if not exists stamps (
   id          bigserial primary key,

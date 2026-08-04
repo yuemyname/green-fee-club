@@ -34,13 +34,14 @@ export async function listCustomers(): Promise<CustomerOverview[]> {
   return rows.map(toOverview);
 }
 
-export async function findByLast4(last4: string): Promise<CustomerOverview | null> {
+/** 뒤 4자리로 고객 조회 — 같은 뒤 4자리가 여러 명일 수 있어 배열로 반환 */
+export async function findCustomersByLast4(last4: string): Promise<CustomerOverview[]> {
   if (!(await isOwner())) throw new Error('UNAUTHORIZED');
   const { rows } = await pool().query(
-    `${OVERVIEW_SQL} where c.last4 = $1 group by c.id`,
+    `${OVERVIEW_SQL} where c.last4 = $1 group by c.id order by c.created_at`,
     [last4],
   );
-  return rows.length ? toOverview(rows[0]) : null;
+  return rows.map(toOverview);
 }
 
 export async function createCustomer(
@@ -55,24 +56,23 @@ export async function createCustomer(
   }
   const last4 = phoneDigits.slice(-4);
   const phone = `${phoneDigits.slice(0, 3)}-${phoneDigits.slice(3, 7)}-${phoneDigits.slice(7, 11)}`;
-  try {
-    const { rows } = await pool().query(
-      'insert into customers (name, phone, last4) values ($1,$2,$3) returning id',
-      [trimmed, phone, last4],
-    );
-    return {
-      ok: true,
-      customer: {
-        id: rows[0].id, name: trimmed, phone, last4,
-        totalStamps: 0, progress: 0, coupons: 0,
-      },
-    };
-  } catch (e: unknown) {
-    if (typeof e === 'object' && e !== null && (e as { code?: string }).code === '23505') {
-      return { ok: false, error: '이미 같은 뒤 4자리 고객이 있습니다.' };
-    }
-    throw e;
-  }
+  // 뒤 4자리 중복은 허용하되, 완전히 같은 번호는 중복 등록 불가
+  const dup = await pool().query(
+    `select 1 from customers where replace(phone, '-', '') = $1 limit 1`,
+    [phoneDigits],
+  );
+  if (dup.rows.length) return { ok: false, error: '이미 등록된 번호입니다.' };
+  const { rows } = await pool().query(
+    'insert into customers (name, phone, last4) values ($1,$2,$3) returning id',
+    [trimmed, phone, last4],
+  );
+  return {
+    ok: true,
+    customer: {
+      id: rows[0].id, name: trimmed, phone, last4,
+      totalStamps: 0, progress: 0, coupons: 0,
+    },
+  };
 }
 
 export interface CustomerDetail {
@@ -82,11 +82,11 @@ export interface CustomerDetail {
 }
 
 /** 적립 전 현재 포인트 조회 — 도장을 찍지 않는다 */
-export async function getCustomerDetail(last4: string): Promise<CustomerDetail | null> {
+export async function getCustomerDetailById(id: number): Promise<CustomerDetail | null> {
   if (!(await isOwner())) throw new Error('UNAUTHORIZED');
   const { rows } = await pool().query(
-    `${OVERVIEW_SQL} where c.last4 = $1 group by c.id`,
-    [last4],
+    `${OVERVIEW_SQL} where c.id = $1 group by c.id`,
+    [id],
   );
   if (!rows.length) return null;
   const customer = toOverview(rows[0]);
@@ -120,7 +120,7 @@ export interface StampResult {
 }
 
 export async function addStamp(
-  last4: string,
+  customerId: number,
   date: string,
 ): Promise<{ ok: true; value: StampResult } | { ok: false; error: string }> {
   if (!(await isOwner())) return { ok: false, error: '권한이 없습니다.' };
@@ -128,12 +128,12 @@ export async function addStamp(
   try {
     await client.query('begin');
     const found = await client.query(
-      'select id from customers where last4 = $1 for update',
-      [last4],
+      'select id from customers where id = $1 for update',
+      [customerId],
     );
     if (!found.rows.length) {
       await client.query('rollback');
-      return { ok: false, error: '등록되지 않은 번호입니다. 고객 등록에서 먼저 추가해 주세요.' };
+      return { ok: false, error: '고객을 찾을 수 없습니다.' };
     }
     const id = found.rows[0].id;
     await client.query('insert into stamps (customer_id, date) values ($1,$2)', [id, date]);

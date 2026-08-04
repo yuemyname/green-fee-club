@@ -18,8 +18,8 @@ npm test             # lib 단위 테스트 (vitest)
 | 이름 | 설명 |
 |---|---|
 | `DATABASE_URL` | Postgres 연결 문자열 (필수) |
-| `OWNER_CODE` | 사장님 로그인 코드, 기본 `1406` |
-| `SESSION_SECRET` | 고객 세션 쿠키 서명 키 (미설정 시 OWNER_CODE 기반 기본값 — 운영에선 설정 권장) |
+| `ADMIN_USERNAME` / `ADMIN_PASSWORD` | 최초 관리자 계정 (admins 테이블이 비었을 때만 생성, 기본 `admin` / `1406`) |
+| `SESSION_SECRET` | 세션 쿠키 서명 키 (미설정 시 기본값 — 운영에선 설정 권장) |
 
 ## Railway 배포
 
@@ -30,7 +30,10 @@ npm test             # lib 단위 테스트 (vitest)
 
 ## 현재 단계 — 2단계 (Postgres) + 확장
 
-- 인증: Server Action이 발급하는 httpOnly 쿠키 `gr_session`(7일)을 `middleware.ts`가 검사
+- 관리자: `admins` 테이블(아이디 + scrypt 해시 비밀번호), 방 관리 화면에서 계정 추가/삭제.
+  로그인 시 서명된 httpOnly 쿠키 `gr_session`(7일) 발급, 서버 액션마다 서명·계정 존재 검증
+- 고객 조회 키: 뒤 4자리는 중복 허용(전체 번호가 고유). 조회 결과가 여러 명이면
+  포인트·예약 화면에서 선택 팝업으로 고른다
 - CRUD 전부 Server Actions (`app/actions/`), 예약 겹침 검사는 DB 트랜잭션에서
   `pg_advisory_xact_lock`으로 방·날짜 단위 직렬화 후 수행
 - 예약 입금 확인: 예약은 `입금 대기`로 생성 → 현황에서 수기 확인(도장 적립) 또는

@@ -24,18 +24,13 @@ export async function startCustomerSession(
   const last4 = phoneDigits.slice(-4);
   const phone = `${phoneDigits.slice(0, 3)}-${phoneDigits.slice(3, 7)}-${phoneDigits.slice(7, 11)}`;
 
+  // 전체 번호가 고유 식별자 — 뒤 4자리가 같아도 번호가 다르면 별도 고객
   const found = await pool().query(
-    'select id, name, phone from customers where last4 = $1',
-    [last4],
+    `select id, name from customers where replace(phone, '-', '') = $1 limit 1`,
+    [phoneDigits],
   );
   if (found.rows.length) {
     const c = found.rows[0];
-    if (c.phone.replace(/\D/g, '') !== phoneDigits) {
-      return {
-        ok: false,
-        error: '같은 뒤 4자리로 등록된 다른 번호가 있습니다. 매장에 문의해 주세요.',
-      };
-    }
     await setCustomerSession(c.id);
     return { ok: true, name: c.name, isNew: false };
   }

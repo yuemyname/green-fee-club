@@ -5,6 +5,7 @@ import {
   createBlock, createRoom, deleteBlock, deleteRoom, listBlocks, listRooms,
   updateRoom, type BlockRow,
 } from '@/app/actions/room';
+import { createAdmin, deleteAdmin, listAdmins, type AdminRow } from '@/app/actions/auth';
 import { fmtDate, toHM, todayStr } from '@/lib/time';
 import type { Room } from '@/lib/types';
 import Btn from '@/components/ui/Btn';
@@ -100,7 +101,12 @@ export default function RoomsPage() {
   const toast = useToast();
   const [rooms, setRooms] = useState<Room[] | null>(null);
   const [blocks, setBlocks] = useState<BlockRow[] | null>(null);
+  const [admins, setAdmins] = useState<AdminRow[] | null>(null);
   const [busy, setBusy] = useState(false);
+
+  // 관리자 추가 폼
+  const [adUser, setAdUser] = useState('');
+  const [adPass, setAdPass] = useState('');
 
   // 방 추가 폼
   const [newName, setNewName] = useState('');
@@ -118,6 +124,7 @@ export default function RoomsPage() {
   const refresh = () => {
     listRooms().then(setRooms).catch(() => setRooms([]));
     listBlocks().then(setBlocks).catch(() => setBlocks([]));
+    listAdmins().then(setAdmins).catch(() => setAdmins([]));
   };
   useEffect(refresh, []);
 
@@ -162,6 +169,34 @@ export default function RoomsPage() {
     setBusy(true);
     try {
       const res = await deleteBlock(id);
+      toast(res.ok ? '삭제되었습니다.' : res.error);
+      if (res.ok) refresh();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const addAdmin = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const res = await createAdmin(adUser, adPass);
+      toast(res.ok ? `관리자 ${adUser.trim()}이(가) 추가되었습니다.` : res.error);
+      if (res.ok) {
+        setAdUser('');
+        setAdPass('');
+        refresh();
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const removeAdmin = async (id: number, username: string) => {
+    if (busy || !window.confirm(`관리자 ${username}을 삭제할까요?`)) return;
+    setBusy(true);
+    try {
+      const res = await deleteAdmin(id);
       toast(res.ok ? '삭제되었습니다.' : res.error);
       if (res.ok) refresh();
     } finally {
@@ -259,6 +294,47 @@ export default function RoomsPage() {
             <TimeSel label="불가 종료 시간" value={blEnd} onChange={setBlEnd} />
           </div>
           <Btn onClick={addBlock} disabled={busy} className="w-full">추가</Btn>
+        </Card>
+      </section>
+
+      <section className="mt-8">
+        <h2 className="text-sm font-bold text-deep">관리자 계정</h2>
+        <p className="mt-1 text-xs text-sub">관리자 화면에 로그인할 수 있는 계정을 관리합니다.</p>
+
+        <div className="mt-3 space-y-2">
+          {admins?.map(a => (
+            <Card key={a.id} className="flex items-center justify-between">
+              <p className="text-sm font-bold">
+                {a.username}
+                {a.isMe && <span className="ml-1.5 rounded-md bg-turf px-1.5 py-0.5 text-[11px] font-bold text-fair">현재 로그인</span>}
+              </p>
+              <Btn tone="ghost" onClick={() => removeAdmin(a.id, a.username)} disabled={busy}>
+                삭제
+              </Btn>
+            </Card>
+          ))}
+        </div>
+
+        <Card className="mt-3 space-y-3 bg-turf">
+          <p className="text-sm font-bold text-deep">관리자 추가</p>
+          <input
+            aria-label="관리자 아이디"
+            value={adUser}
+            onChange={e => setAdUser(e.target.value)}
+            placeholder="아이디 (3자 이상)"
+            className="h-11 w-full rounded-lg border border-line bg-white px-3 text-base outline-none placeholder:text-sub focus:border-fair"
+          />
+          <input
+            aria-label="관리자 비밀번호"
+            type="password"
+            value={adPass}
+            onChange={e => setAdPass(e.target.value)}
+            placeholder="비밀번호 (4자 이상)"
+            className="h-11 w-full rounded-lg border border-line bg-white px-3 text-base outline-none placeholder:text-sub focus:border-fair"
+          />
+          <Btn onClick={addAdmin} disabled={busy || adUser.trim().length < 3 || adPass.length < 4} className="w-full">
+            관리자 추가
+          </Btn>
         </Card>
       </section>
     </div>

@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { findByLast4 } from '@/app/actions/customer';
+import { findCustomersByLast4 } from '@/app/actions/customer';
 import { createReservation, listBoard, type Board } from '@/app/actions/reservation';
 import { STAMP_GOAL } from '@/lib/constants';
 import { buildTimeline, slotsFor } from '@/lib/timeline';
@@ -11,6 +11,7 @@ import type { CustomerOverview } from '@/lib/types';
 import Btn from '@/components/ui/Btn';
 import DatePicker from '@/components/ui/DatePicker';
 import Eyebrow from '@/components/ui/Eyebrow';
+import CustomerPicker from '@/components/CustomerPicker';
 import SlotPicker from '@/components/SlotPicker';
 import { useToast } from '@/components/ui/Toast';
 
@@ -30,6 +31,8 @@ function BookInner() {
   const [last4, setLast4] = useState('');
   const [customer, setCustomer] = useState<CustomerOverview | null>(null);
   const [looked, setLooked] = useState(false);
+  const [candidates, setCandidates] = useState<CustomerOverview[]>([]);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [useFree, setUseFree] = useState(false);
   const [busy, setBusy] = useState(false);
   const [prefilled, setPrefilled] = useState(false);
@@ -92,17 +95,21 @@ function BookInner() {
     }
   }, [board, prefilled, params, roomData]);
 
-  // 4자리 입력되면 즉시 조회
+  // 4자리 입력되면 즉시 조회 — 같은 뒤 4자리가 여러 명이면 선택 팝업
   useEffect(() => {
     if (last4.length !== 4) {
       setCustomer(null);
       setLooked(false);
+      setCandidates([]);
+      setPickerOpen(false);
       return;
     }
     let alive = true;
-    findByLast4(last4).then(c => {
+    findCustomersByLast4(last4).then(list => {
       if (!alive) return;
-      setCustomer(c);
+      setCandidates(list);
+      setCustomer(list.length === 1 ? list[0] : null);
+      setPickerOpen(list.length > 1);
       setLooked(true);
     }).catch(() => {
       if (alive) setLooked(true);
@@ -131,7 +138,7 @@ function BookInner() {
         room_id: selection.roomId,
         start_min: selection.start,
         people,
-        last4,
+        customer_id: customer.id,
         use_free: useFree,
       });
       if (!res.ok) {
@@ -216,6 +223,17 @@ function BookInner() {
         </div>
       )}
 
+      {pickerOpen && (
+        <CustomerPicker
+          candidates={candidates}
+          onPick={c => {
+            setCustomer(c);
+            setPickerOpen(false);
+          }}
+          onClose={() => setPickerOpen(false)}
+        />
+      )}
+
       {/* 5. 확정 시트 — 시간을 선택하면 하단에 고정으로 떠서 스크롤 없이 예약 */}
       {selection && selectedRoom && <div className="h-80" />}
       {selection && selectedRoom && (
@@ -239,10 +257,19 @@ function BookInner() {
               placeholder="뒤 4자리"
               className="h-12 w-full rounded-lg border border-line bg-white px-4 text-center text-xl font-bold tracking-widest tabular-nums outline-none placeholder:text-base placeholder:font-normal placeholder:tracking-normal placeholder:text-sub focus:border-fair"
             />
-            {looked && last4.length === 4 && !customer && (
+            {looked && last4.length === 4 && !customer && candidates.length === 0 && (
               <p className="mt-2 text-sm font-semibold text-flag">
                 등록되지 않은 번호입니다. 고객 등록에서 먼저 추가해 주세요.
               </p>
+            )}
+            {looked && !customer && candidates.length > 1 && (
+              <button
+                type="button"
+                onClick={() => setPickerOpen(true)}
+                className="mt-2 flex min-h-11 w-full items-center justify-center rounded-lg border border-fair bg-white text-sm font-semibold text-fair"
+              >
+                같은 뒤 4자리 고객 {candidates.length}명 — 고객 선택
+              </button>
             )}
             {customer && (
               <p className="mt-2 text-sm font-semibold tabular-nums">

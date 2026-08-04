@@ -53,7 +53,7 @@ export interface BookingInput {
   room_id: number;
   start_min: number;
   people: number;
-  last4: string;
+  customer_id: number;
   use_free: boolean;
 }
 
@@ -70,12 +70,12 @@ export async function createReservation(
     ]);
 
     const cust = await client.query(
-      'select id, name from customers where last4 = $1',
-      [input.last4],
+      'select id, name from customers where id = $1',
+      [input.customer_id],
     );
     if (!cust.rows.length) {
       await client.query('rollback');
-      return { ok: false, error: '등록되지 않은 번호입니다. 고객 등록에서 먼저 추가해 주세요.' };
+      return { ok: false, error: '고객을 찾을 수 없습니다. 고객 등록에서 먼저 추가해 주세요.' };
     }
 
     const err = await insertReservation(client, cust.rows[0].id, input);
