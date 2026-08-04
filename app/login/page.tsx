@@ -50,10 +50,6 @@ export default function LoginPage() {
           로그인
         </Btn>
       </div>
-
-      <p className="mt-6 text-center text-xs text-sub">
-        체험용 비밀번호: <span className="font-semibold tabular-nums">1406</span>
-      </p>
     </div>
   );
 }

@@ -25,6 +25,14 @@ export async function logout(): Promise<void> {
 
 type Result = { ok: true } | { ok: false; error: string };
 
+/** 현재 로그인한 관리자 아이디 (헤더 표시용) */
+export async function me(): Promise<string | null> {
+  const id = await adminId();
+  if (id === null) return null;
+  const { rows } = await pool().query('select username from admins where id = $1', [id]);
+  return rows.length ? rows[0].username : null;
+}
+
 export interface AdminRow {
   id: number;
   username: string;

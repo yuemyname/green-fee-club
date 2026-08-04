@@ -52,7 +52,7 @@ export default function CustomerPage() {
           label="이름"
           value={name}
           onChange={e => setName(e.target.value)}
-          placeholder="정승우"
+          placeholder="홍길동"
         />
         <Field
           label="전화번호"
@@ -62,7 +62,7 @@ export default function CustomerPage() {
           value={phone}
           onChange={e => setPhone(e.target.value.replace(/\D/g, ''))}
           onKeyDown={e => e.key === 'Enter' && submit()}
-          placeholder="01053971406"
+          placeholder="01011112222"
         />
         <Btn onClick={submit} disabled={busy} className="w-full">
           고객 등록
