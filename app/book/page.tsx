@@ -257,7 +257,7 @@ function BookInner() {
               type="button"
               onClick={() => setUseFree(v => !v)}
               className={`flex min-h-11 w-full items-center justify-between rounded-lg border px-3 text-sm font-semibold transition-opacity active:opacity-80 ${
-                useFree ? 'border-flag bg-flag text-white' : 'border-line bg-white text-ink'
+                useFree ? 'border-flag bg-flag text-white' : 'border-flag/40 bg-flag/10 text-flag'
               }`}
             >
               <span>무료 예약권 사용 (이번 이용은 도장 없음)</span>
