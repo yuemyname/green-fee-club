@@ -17,8 +17,14 @@ npm run build   # 프로덕션 빌드
 ## 현재 단계 — 1단계 (DB 없이)
 
 - 데이터는 브라우저 `localStorage`(`greenround:v1`)에 저장되고, 첫 실행 시 시드 데이터가 들어갑니다.
-- 인증은 Server Action(`app/actions/auth.ts`)이 발급하는 httpOnly 쿠키 `gr_session`(7일)을 `middleware.ts`가 검사합니다.
-- 2단계에서 Supabase(Postgres)로 CRUD를 옮기고 예약 겹침 검사를 DB 트랜잭션으로 이동합니다. 스키마는 `SPEC.md` 3-2 참고.
+- 인증은 클라이언트가 발급하는 쿠키 `gr_session`(7일)을 서버 배포에선 `middleware.ts`가, 정적 배포에선 `AuthGuard`가 검사합니다.
+- 2단계에서 Supabase(Postgres)로 CRUD를 옮기고, 인증을 Server Action + httpOnly 쿠키로 되돌리고, 예약 겹침 검사를 DB 트랜잭션으로 이동합니다. 스키마는 `SPEC.md` 3-2 참고.
+
+## GitHub Pages 배포
+
+푸시하면 `.github/workflows/pages.yml`이 정적 내보내기(`STATIC_EXPORT=1`, basePath `/green-fee-club`)로 빌드해 Pages에 배포합니다.
+저장소 **Settings → Pages → Source**를 **GitHub Actions**로 한 번만 설정하면 됩니다.
+주소: `https://<owner>.github.io/green-fee-club/`
 
 ## 화면
 

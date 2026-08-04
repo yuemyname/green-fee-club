@@ -2,12 +2,12 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { logout } from '@/app/actions/auth';
+import { logout } from '@/lib/auth';
 
 export default function Header() {
   const pathname = usePathname();
   const router = useRouter();
-  if (pathname === '/login') return null;
+  if (pathname.replace(/\/+$/, '') === '/login') return null;
 
   return (
     <header className="border-b border-line bg-white">
@@ -17,8 +17,8 @@ export default function Header() {
         </Link>
         <button
           type="button"
-          onClick={async () => {
-            await logout();
+          onClick={() => {
+            logout();
             router.replace('/login');
           }}
           className="flex min-h-11 items-center rounded-lg border border-line bg-white px-3 text-sm font-semibold text-sub"
