@@ -1,4 +1,5 @@
-// 스키마 적용 + (비어있을 때만) 시드. Railway 배포 시 start 전에 실행된다.
+// 스키마 적용 + 매장/관리자/방 기본 데이터. Railway 배포 시 start 전에 실행된다.
+// 고객/도장/예약 샘플 데이터는 넣지 않는다 (로컬 개발용은 scripts/seed-dev.mjs).
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -13,14 +14,6 @@ if (!url) {
 
 const dir = path.dirname(fileURLToPath(import.meta.url));
 const schema = readFileSync(path.join(dir, '../db/schema.sql'), 'utf8');
-
-const ymd = d =>
-  `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
-const daysAgo = n => {
-  const d = new Date();
-  d.setDate(d.getDate() - n);
-  return ymd(d);
-};
 
 const client = new pg.Client({ connectionString: url });
 await client.connect();
@@ -97,40 +90,23 @@ try {
     console.log('방 시드 완료 (1번방, 2번방)');
   }
 
-  const { rows } = await client.query('select count(*)::int as n from customers');
-  if (rows[0].n > 0) {
-    console.log(`고객 ${rows[0].n}명 존재 — 시드 생략`);
-  } else {
-    const seed = async (name, phone, stampCount, used = 0) => {
-      const digits = phone.replace(/\D/g, '');
-      const fmt = `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7, 11)}`;
-      const res = await client.query(
-        'insert into customers (name, phone, last4, used_coupons) values ($1,$2,$3,$4) returning id',
-        [name, fmt, digits.slice(-4), used],
-      );
-      const id = res.rows[0].id;
-      for (let i = stampCount; i >= 1; i--) {
-        await client.query('insert into stamps (customer_id, date) values ($1,$2)', [id, daysAgo(i)]);
-      }
-      return id;
-    };
-
-    const c1 = await seed('정승우', '01053971406', 17);    // 쿠폰 1장 + 진행 7칸
-    const c2 = await seed('김민지', '01041127788', 7);
-    const c3 = await seed('박도윤', '01098305522', 20, 1); // 쿠폰 2장 중 1장 사용(아래 무료 예약)
-    await seed('이서연', '01026743314', 3);
-
-    const today = daysAgo(0);
-    const resv = (date, room, start, end, cid, people, payment) =>
-      client.query(
-        `insert into reservations (date, room_id, start_min, end_min, customer_id, people, is_free, payment, paid_at)
-         values ($1,$2,$3,$4,$5,$6,$7,$8, case when $8 = 'pending' then null else now() end)`,
-        [date, room, start, end, cid, people, payment === 'point', payment],
-      );
-    await resv(today, 1, 600, 730, c2, 2, 'pending'); // 입금 대기 데모
-    await resv(today, 2, 840, 1100, c1, 4, 'manual');
-    await resv(daysAgo(1), 1, 1140, 1210, c3, 1, 'point');
-    console.log('시드 데이터 입력 완료');
+  // 기존 DB에 남아있는 샘플 고객/도장/예약을 1회만 삭제한다.
+  // (관리자·매장·방·예약 불가 시간 설정은 유지)
+  await client.query(
+    `create table if not exists app_flags (
+       key text primary key,
+       created_at timestamptz default now()
+     )`,
+  );
+  const cleaned = await client.query(
+    `select 1 from app_flags where key = 'sample_data_cleaned'`,
+  );
+  if (!cleaned.rows.length) {
+    const r = await client.query('delete from reservations');
+    const s = await client.query('delete from stamps');
+    const c = await client.query('delete from customers');
+    await client.query(`insert into app_flags (key) values ('sample_data_cleaned')`);
+    console.log(`샘플 데이터 삭제: 예약 ${r.rowCount}건, 도장 ${s.rowCount}개, 고객 ${c.rowCount}명`);
   }
 } finally {
   await client.end();

@@ -10,6 +10,7 @@
     "build": "next build",
     "start": "next start",
     "db:migrate": "node scripts/migrate.mjs",
+    "db:seed-dev": "node scripts/seed-dev.mjs",
     "test": "vitest run"
   },
   "dependencies": {

@@ -8,7 +8,8 @@
 ```bash
 npm install
 export DATABASE_URL=postgres://user:pass@localhost:5432/greenround
-npm run db:migrate   # 스키마 적용 + (비어있으면) 시드
+npm run db:migrate   # 스키마 적용 + 매장/관리자/방 기본 데이터
+npm run db:seed-dev  # (선택) 로컬 개발용 샘플 고객/예약
 npm run dev          # http://localhost:3000
 npm test             # lib 단위 테스트 (vitest)
 ```
@@ -46,7 +47,7 @@ npm test             # lib 단위 테스트 (vitest)
   본인 예약 등록·변경·취소와 포인트 조회만 가능. 다른 고객 정보는 노출하지 않고,
   입금 확인이 끝난 예약은 온라인 변경·취소 불가. 브라우저는 회선 번호를 제공하지
   않으므로 최초 1회 번호 입력이 필요하다 (PASS/SMS 인증은 추후 확장 지점)
-- 스키마: `db/schema.sql`, 시드·백필: `scripts/migrate.mjs`
+- 스키마: `db/schema.sql`, 마이그레이션·백필: `scripts/migrate.mjs` (운영에는 샘플 데이터를 넣지 않음, 개발용은 `scripts/seed-dev.mjs`)
 
 ## 구조
 
