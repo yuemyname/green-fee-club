@@ -18,7 +18,7 @@ export default function Header() {
       <header className="border-b border-line bg-white">
         <div className="mx-auto flex h-14 max-w-xl items-center justify-between px-4">
           <Link href="/my" className="text-lg font-black tracking-tight text-deep">
-            그린라운드
+            트윈빌스크린
           </Link>
           {clean !== '/my/start' && (
             <button
@@ -42,7 +42,7 @@ export default function Header() {
     <header className="border-b border-line bg-white">
       <div className="mx-auto flex h-14 max-w-xl items-center justify-between px-4">
         <Link href="/" className="text-lg font-black tracking-tight text-deep">
-          그린라운드
+          트윈빌스크린
         </Link>
         <button
           type="button"

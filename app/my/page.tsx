@@ -124,7 +124,7 @@ export default function MyHomePage() {
 
   return (
     <div>
-      <Eyebrow>MY GREEN ROUND</Eyebrow>
+      <Eyebrow>MY TWINVILL</Eyebrow>
       <Card className="mt-2 flex items-center justify-between bg-turf">
         <div>
           <p className="text-lg font-black text-deep">{data.customer.name}</p>

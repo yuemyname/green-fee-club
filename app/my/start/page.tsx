@@ -33,7 +33,7 @@ export default function MyStartPage() {
     <div className="flex flex-col justify-center pt-16">
       <Eyebrow>SCREEN GOLF</Eyebrow>
       <h1 className="mt-2 text-4xl font-black leading-tight text-deep" style={{ letterSpacing: '-0.03em' }}>
-        그린라운드
+        트윈빌스크린
         <br />
         예약과 포인트를 한번에
       </h1>

@@ -4,7 +4,7 @@ import Header from '@/components/Header';
 import { ToastProvider } from '@/components/ui/Toast';
 
 export const metadata: Metadata = {
-  title: '그린라운드 — 스크린골프 예약',
+  title: '트윈빌스크린 — 스크린골프 예약',
   description: '스크린골프 예약 + 포인트 적립',
 };
 
