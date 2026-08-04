@@ -23,6 +23,8 @@ create table if not exists reservations (
   customer_id bigint not null references customers(id),
   people      int not null,
   is_free     boolean not null default false,
+  payment     text not null default 'pending',  -- pending | manual | point
+  paid_at     timestamptz,
   created_at  timestamptz default now()
 );
 

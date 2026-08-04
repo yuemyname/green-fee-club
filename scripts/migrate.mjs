@@ -27,6 +27,22 @@ try {
   await client.query(schema);
   console.log('스키마 적용 완료');
 
+  // 기존 DB에 payment 컬럼이 없으면 추가하고, 이전 예약은 확인 완료로 백필
+  const hasPayment = await client.query(
+    `select 1 from information_schema.columns
+     where table_name = 'reservations' and column_name = 'payment'`,
+  );
+  if (!hasPayment.rows.length) {
+    await client.query(`alter table reservations add column payment text not null default 'pending'`);
+    await client.query('alter table reservations add column paid_at timestamptz');
+    await client.query(
+      `update reservations
+       set payment = case when is_free then 'point' else 'manual' end,
+           paid_at = created_at`,
+    );
+    console.log('payment 컬럼 추가 + 기존 예약 백필 완료');
+  }
+
   const { rows } = await client.query('select count(*)::int as n from customers');
   if (rows[0].n > 0) {
     console.log(`고객 ${rows[0].n}명 존재 — 시드 생략`);
@@ -51,14 +67,15 @@ try {
     await seed('이서연', '01026743314', 3);
 
     const today = daysAgo(0);
-    const resv = (date, room, start, end, cid, people, free) =>
+    const resv = (date, room, start, end, cid, people, payment) =>
       client.query(
-        'insert into reservations (date, room_id, start_min, end_min, customer_id, people, is_free) values ($1,$2,$3,$4,$5,$6,$7)',
-        [date, room, start, end, cid, people, free],
+        `insert into reservations (date, room_id, start_min, end_min, customer_id, people, is_free, payment, paid_at)
+         values ($1,$2,$3,$4,$5,$6,$7,$8, case when $8 = 'pending' then null else now() end)`,
+        [date, room, start, end, cid, people, payment === 'point', payment],
       );
-    await resv(today, 1, 600, 730, c2, 2, false);
-    await resv(today, 2, 840, 1100, c1, 4, false);
-    await resv(daysAgo(1), 1, 1140, 1210, c3, 1, true);
+    await resv(today, 1, 600, 730, c2, 2, 'pending'); // 입금 대기 데모
+    await resv(today, 2, 840, 1100, c1, 4, 'manual');
+    await resv(daysAgo(1), 1, 1140, 1210, c3, 1, 'point');
     console.log('시드 데이터 입력 완료');
   }
 } finally {

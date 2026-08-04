@@ -113,9 +113,9 @@ function BookInner() {
         return;
       }
       toast(
-        res.cardCompleted
-          ? `카드 완성! ${res.customerName}님 무료 예약권 1장이 나왔습니다.`
-          : `${res.customerName}님 예약이 확정되었습니다.`,
+        useFree
+          ? `${res.customerName}님 무료 예약권으로 예약이 확정되었습니다.`
+          : `${res.customerName}님 예약이 확정되었습니다. 입금 확인은 예약 현황에서 할 수 있습니다.`,
       );
       setSelection(null);
       setLast4('');

@@ -14,6 +14,8 @@ export default function StatusPage() {
   const [date, setDate] = useState(todayStr());
   const [rows, setRows] = useState<ReservationRow[] | null>(null);
 
+  const refresh = () => listByDate(date).then(setRows).catch(() => setRows([]));
+
   useEffect(() => {
     let alive = true;
     listByDate(date).then(r => {
@@ -46,6 +48,7 @@ export default function StatusPage() {
               roomId={room.id}
               roomName={room.name}
               date={date}
+              onChanged={refresh}
             />
           ))}
         </div>

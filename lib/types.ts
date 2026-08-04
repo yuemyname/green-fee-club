@@ -1,3 +1,6 @@
+/** 입금 확인 상태: 대기 / 수기 입금 확인 / 무료 예약권(포인트) 사용 */
+export type PaymentState = 'pending' | 'manual' | 'point';
+
 export interface Reservation {
   id: number;
   date: string;         // yyyymmdd
@@ -9,9 +12,11 @@ export interface Reservation {
   is_free: boolean;
 }
 
-/** 현황/타임라인 표시용 — 고객 이름 포함 */
+/** 현황/타임라인 표시용 — 고객 이름·입금 상태 포함 */
 export interface ReservationRow extends Reservation {
   customer_name: string;
+  payment: PaymentState;
+  customer_coupons: number; // 해당 고객의 사용 가능한 무료 예약권
 }
 
 /** 고객 + 파생 값 (도장 수·쿠폰) */
