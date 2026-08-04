@@ -5,7 +5,7 @@ import {
   createBlock, createRoom, deleteBlock, deleteRoom, listBlocks, listRooms,
   updateRoom, type BlockRow,
 } from '@/app/actions/room';
-import { createAdmin, deleteAdmin, listAdmins, type AdminRow } from '@/app/actions/auth';
+import { changeAdminPassword, getStore, listAdmins, type AdminRow, type StoreInfo } from '@/app/actions/auth';
 import { fmtDate, toHM, todayStr } from '@/lib/time';
 import type { Room } from '@/lib/types';
 import Btn from '@/components/ui/Btn';
@@ -102,11 +102,12 @@ export default function RoomsPage() {
   const [rooms, setRooms] = useState<Room[] | null>(null);
   const [blocks, setBlocks] = useState<BlockRow[] | null>(null);
   const [admins, setAdmins] = useState<AdminRow[] | null>(null);
+  const [store, setStore] = useState<StoreInfo | null>(null);
   const [busy, setBusy] = useState(false);
 
-  // 관리자 추가 폼
-  const [adUser, setAdUser] = useState('');
-  const [adPass, setAdPass] = useState('');
+  // 관리자 비밀번호 변경 폼 (행 단위)
+  const [pwFor, setPwFor] = useState<number | null>(null);
+  const [pwVal, setPwVal] = useState('');
 
   // 방 추가 폼
   const [newName, setNewName] = useState('');
@@ -125,6 +126,7 @@ export default function RoomsPage() {
     listRooms().then(setRooms).catch(() => setRooms([]));
     listBlocks().then(setBlocks).catch(() => setBlocks([]));
     listAdmins().then(setAdmins).catch(() => setAdmins([]));
+    getStore().then(setStore).catch(() => {});
   };
   useEffect(refresh, []);
 
@@ -176,29 +178,16 @@ export default function RoomsPage() {
     }
   };
 
-  const addAdmin = async () => {
+  const changePw = async (id: number) => {
     if (busy) return;
     setBusy(true);
     try {
-      const res = await createAdmin(adUser, adPass);
-      toast(res.ok ? `관리자 ${adUser.trim()}이(가) 추가되었습니다.` : res.error);
+      const res = await changeAdminPassword(id, pwVal);
+      toast(res.ok ? '비밀번호가 변경되었습니다.' : res.error);
       if (res.ok) {
-        setAdUser('');
-        setAdPass('');
-        refresh();
+        setPwFor(null);
+        setPwVal('');
       }
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const removeAdmin = async (id: number, username: string) => {
-    if (busy || !window.confirm(`관리자 ${username}을 삭제할까요?`)) return;
-    setBusy(true);
-    try {
-      const res = await deleteAdmin(id);
-      toast(res.ok ? '삭제되었습니다.' : res.error);
-      if (res.ok) refresh();
     } finally {
       setBusy(false);
     }
@@ -299,43 +288,48 @@ export default function RoomsPage() {
 
       <section className="mt-8">
         <h2 className="text-sm font-bold text-deep">관리자 계정</h2>
-        <p className="mt-1 text-xs text-sub">관리자 화면에 로그인할 수 있는 계정을 관리합니다.</p>
+        <p className="mt-1 text-xs text-sub">
+          {store ? `${store.name} (매장번호 ${store.code})` : '매장'} 소속 관리자 계정입니다. 비밀번호만 변경할 수 있습니다.
+        </p>
 
         <div className="mt-3 space-y-2">
           {admins?.map(a => (
-            <Card key={a.id} className="flex items-center justify-between">
-              <p className="text-sm font-bold">
-                {a.username}
-                {a.isMe && <span className="ml-1.5 rounded-md bg-turf px-1.5 py-0.5 text-[11px] font-bold text-fair">현재 로그인</span>}
-              </p>
-              <Btn tone="ghost" onClick={() => removeAdmin(a.id, a.username)} disabled={busy}>
-                삭제
-              </Btn>
+            <Card key={a.id}>
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-bold">
+                  {a.username}
+                  {a.isMe && <span className="ml-1.5 rounded-md bg-turf px-1.5 py-0.5 text-[11px] font-bold text-fair">현재 로그인</span>}
+                </p>
+                <Btn
+                  tone="ghost"
+                  onClick={() => {
+                    setPwFor(pwFor === a.id ? null : a.id);
+                    setPwVal('');
+                  }}
+                  disabled={busy}
+                >
+                  비밀번호 변경
+                </Btn>
+              </div>
+              {pwFor === a.id && (
+                <div className="mt-3 flex gap-2">
+                  <input
+                    aria-label={`${a.username} 새 비밀번호`}
+                    type="password"
+                    value={pwVal}
+                    onChange={e => setPwVal(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && pwVal.length >= 4 && changePw(a.id)}
+                    placeholder="새 비밀번호 (4자 이상)"
+                    className="h-11 min-w-0 flex-1 rounded-lg border border-line bg-white px-3 text-base outline-none placeholder:text-sub focus:border-fair"
+                  />
+                  <Btn onClick={() => changePw(a.id)} disabled={busy || pwVal.length < 4}>
+                    변경
+                  </Btn>
+                </div>
+              )}
             </Card>
           ))}
         </div>
-
-        <Card className="mt-3 space-y-3 bg-turf">
-          <p className="text-sm font-bold text-deep">관리자 추가</p>
-          <input
-            aria-label="관리자 아이디"
-            value={adUser}
-            onChange={e => setAdUser(e.target.value)}
-            placeholder="아이디 (3자 이상)"
-            className="h-11 w-full rounded-lg border border-line bg-white px-3 text-base outline-none placeholder:text-sub focus:border-fair"
-          />
-          <input
-            aria-label="관리자 비밀번호"
-            type="password"
-            value={adPass}
-            onChange={e => setAdPass(e.target.value)}
-            placeholder="비밀번호 (4자 이상)"
-            className="h-11 w-full rounded-lg border border-line bg-white px-3 text-base outline-none placeholder:text-sub focus:border-fair"
-          />
-          <Btn onClick={addAdmin} disabled={busy || adUser.trim().length < 3 || adPass.length < 4} className="w-full">
-            관리자 추가
-          </Btn>
-        </Card>
       </section>
     </div>
   );

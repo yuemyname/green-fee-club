@@ -47,17 +47,46 @@ try {
   // 기존 DB의 last4 unique 제약 제거 — 뒤 4자리가 같은 고객 등록 허용
   await client.query('alter table customers drop constraint if exists customers_last4_key');
 
-  // 관리자가 없으면 초기 계정 생성 (ADMIN_USERNAME/ADMIN_PASSWORD, 기본 admin / OWNER_CODE)
-  const adminCount = await client.query('select count(*)::int as n from admins');
-  if (!adminCount.rows[0].n) {
-    const username = process.env.ADMIN_USERNAME ?? 'admin';
-    const password = process.env.ADMIN_PASSWORD ?? process.env.OWNER_CODE ?? '1406';
+  // 매장이 없으면 1건 생성
+  let storeId;
+  const store = await client.query('select id from stores order by id limit 1');
+  if (store.rows.length) {
+    storeId = store.rows[0].id;
+  } else {
+    const created = await client.query(
+      'insert into stores (code, name) values ($1,$2) returning id',
+      [process.env.STORE_CODE ?? '1001', process.env.STORE_NAME ?? '트윈빌스크린'],
+    );
+    storeId = created.rows[0].id;
+    console.log('매장 생성: 1001 트윈빌스크린');
+  }
+
+  // 기존 DB의 admins에 store_id 컬럼이 없으면 추가하고 매장에 소속시킨다
+  const hasStoreCol = await client.query(
+    `select 1 from information_schema.columns
+     where table_name = 'admins' and column_name = 'store_id'`,
+  );
+  if (!hasStoreCol.rows.length) {
+    await client.query('alter table admins add column store_id bigint references stores(id)');
+  }
+  await client.query('update admins set store_id = $1 where store_id is null', [storeId]);
+
+  // 관리자가 3명이 될 때까지 admin1~3을 채운다 (초기 비밀번호는 ADMIN_PASSWORD, 기본 1406)
+  const hashOf = pw => {
     const salt = randomBytes(16).toString('hex');
-    const hash = scryptSync(password, salt, 32).toString('hex');
-    await client.query('insert into admins (username, password_hash) values ($1,$2)', [
-      username, `${salt}:${hash}`,
-    ]);
-    console.log(`초기 관리자 생성: ${username}`);
+    return `${salt}:${scryptSync(pw, salt, 32).toString('hex')}`;
+  };
+  const password = process.env.ADMIN_PASSWORD ?? process.env.OWNER_CODE ?? '1406';
+  for (const username of ['admin1', 'admin2', 'admin3']) {
+    const n = await client.query('select count(*)::int as n from admins');
+    if (n.rows[0].n >= 3) break;
+    const exists = await client.query('select 1 from admins where username = $1', [username]);
+    if (exists.rows.length) continue;
+    await client.query(
+      'insert into admins (store_id, username, password_hash) values ($1,$2,$3)',
+      [storeId, username, hashOf(password)],
+    );
+    console.log(`관리자 생성: ${username}`);
   }
 
   // 방이 없으면 기본 2개를 등록 (기존 예약의 room_id 1·2와 맞춤)

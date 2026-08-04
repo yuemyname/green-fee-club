@@ -1,5 +1,13 @@
+create table if not exists stores (
+  id          bigserial primary key,
+  code        text not null unique,      -- 매장 번호
+  name        text not null,
+  created_at  timestamptz default now()
+);
+
 create table if not exists admins (
   id            bigserial primary key,
+  store_id      bigint references stores(id),
   username      text not null unique,
   password_hash text not null,           -- scrypt salt:hash
   created_at    timestamptz default now()

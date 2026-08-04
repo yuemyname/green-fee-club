@@ -44,7 +44,7 @@ export default function LoginPage() {
           value={username}
           onChange={e => setUsername(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && submit()}
-          placeholder="admin"
+          placeholder="admin1"
           autoFocus
         />
         <Field
@@ -62,7 +62,7 @@ export default function LoginPage() {
       </div>
 
       <p className="mt-6 text-center text-xs text-sub">
-        체험용 계정: <span className="font-semibold">admin / 1406</span>
+        체험용 계정: <span className="font-semibold">admin1 / 1406</span>
       </p>
     </div>
   );
