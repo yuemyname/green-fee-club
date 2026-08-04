@@ -19,6 +19,14 @@ const daysAgo = n => {
 const client = new pg.Client({ connectionString: url });
 await client.connect();
 try {
+  // 방이 없으면 기본 2개 (테스트가 room_id 1·2를 가정)
+  const roomCount = await client.query('select count(*)::int as n from rooms');
+  if (!roomCount.rows[0].n) {
+    await client.query(`insert into rooms (id, name) values (1, '1번방'), (2, '2번방')`);
+    await client.query(`select setval('rooms_id_seq', 2)`);
+    console.log('개발용 방 시드 완료 (1번방, 2번방)');
+  }
+
   const { rows } = await client.query('select count(*)::int as n from customers');
   if (rows[0].n > 0) {
     console.log(`고객 ${rows[0].n}명 존재 — 시드 생략`);

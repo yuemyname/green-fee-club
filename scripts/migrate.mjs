@@ -82,14 +82,6 @@ try {
     console.log(`관리자 생성: ${username}`);
   }
 
-  // 방이 없으면 기본 2개를 등록 (기존 예약의 room_id 1·2와 맞춤)
-  const roomCount = await client.query('select count(*)::int as n from rooms');
-  if (!roomCount.rows[0].n) {
-    await client.query(`insert into rooms (id, name) values (1, '1번방'), (2, '2번방')`);
-    await client.query(`select setval('rooms_id_seq', 2)`);
-    console.log('방 시드 완료 (1번방, 2번방)');
-  }
-
   // 기존 DB에 남아있는 샘플 고객/도장/예약을 1회만 삭제한다.
   // (관리자·매장·방·예약 불가 시간 설정은 유지)
   await client.query(
@@ -107,6 +99,24 @@ try {
     const c = await client.query('delete from customers');
     await client.query(`insert into app_flags (key) values ('sample_data_cleaned')`);
     console.log(`샘플 데이터 삭제: 예약 ${r.rowCount}건, 도장 ${s.rowCount}개, 고객 ${c.rowCount}명`);
+  }
+
+  // 2차 정리: 고객 데이터와 방 데이터(예약 불가 시간 포함)까지 1회만 삭제.
+  // 관리자·매장 정보만 남긴다. 방은 방 관리 화면에서 직접 등록한다.
+  const cleaned2 = await client.query(
+    `select 1 from app_flags where key = 'sample_data_cleaned_v2'`,
+  );
+  if (!cleaned2.rows.length) {
+    const r = await client.query('delete from reservations');
+    const s = await client.query('delete from stamps');
+    const c = await client.query('delete from customers');
+    const b = await client.query('delete from blocks');
+    const rm = await client.query('delete from rooms');
+    await client.query(`insert into app_flags (key) values ('sample_data_cleaned_v2')`);
+    console.log(
+      `2차 정리: 예약 ${r.rowCount}건, 도장 ${s.rowCount}개, 고객 ${c.rowCount}명, ` +
+      `예약 불가 ${b.rowCount}건, 방 ${rm.rowCount}개 삭제`,
+    );
   }
 } finally {
   await client.end();
