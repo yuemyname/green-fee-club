@@ -45,11 +45,19 @@ function BookInner() {
     refresh(date);
   }, [date]);
 
-  const roomSlots = useMemo(() => {
-    if (!rows) return new Map<number, number[]>();
-    return new Map(
-      ROOMS.map(room => [room.id, slotsFor(buildTimeline(rows, room.id, date), need)]),
-    );
+  const roomData = useMemo(() => {
+    const map = new Map<number, { slots: number[]; busy: { start: number; end: number }[] }>();
+    if (!rows) return map;
+    for (const room of ROOMS) {
+      const timeline = buildTimeline(rows, room.id, date);
+      map.set(room.id, {
+        slots: slotsFor(timeline, need),
+        busy: timeline
+          .filter(s => s.type === 'busy')
+          .map(s => ({ start: s.start, end: s.end })),
+      });
+    }
+    return map;
   }, [rows, date, need]);
 
   // /status에서 넘어온 날짜·방·시작시각 프리필
@@ -60,10 +68,10 @@ function BookInner() {
     const start = Number(params.get('start'));
     if (!room || !params.get('start') || Number.isNaN(start)) return;
     const aligned = Math.ceil(start / 30) * 30;
-    if (roomSlots.get(room)?.includes(aligned)) {
+    if (roomData.get(room)?.slots.includes(aligned)) {
       setSelection({ roomId: room, start: aligned });
     }
-  }, [rows, prefilled, params, roomSlots]);
+  }, [rows, prefilled, params, roomData]);
 
   // 4자리 입력되면 즉시 조회
   useEffect(() => {
@@ -170,7 +178,8 @@ function BookInner() {
             <SlotPicker
               key={room.id}
               roomName={room.name}
-              slots={roomSlots.get(room.id) ?? []}
+              slots={roomData.get(room.id)?.slots ?? []}
+              busy={roomData.get(room.id)?.busy ?? []}
               need={need}
               selected={selection?.roomId === room.id ? selection.start : null}
               onSelect={start => {
