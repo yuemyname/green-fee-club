@@ -75,23 +75,34 @@ export default function SlotPicker({
               <p className="mt-3 text-xs font-semibold text-sub">
                 시작 가능 시간 — 원하는 시작 시간을 <b className="text-fair">하나만</b> 고르세요
               </p>
-              <div className="mt-1.5 flex flex-wrap gap-2">
-                {slots.map(s => {
-                  const active = selected === s;
-                  return (
-                    <button
-                      key={s}
-                      type="button"
-                      onClick={() => onSelect(s)}
-                      className={`min-h-11 rounded-lg border px-3 text-sm font-semibold tabular-nums transition-opacity active:opacity-80 ${
-                        active ? 'border-fair bg-fair text-white' : 'border-line bg-white text-ink'
-                      }`}
-                    >
-                      {toHM(s)} – {toHM(s + need)}
-                    </button>
-                  );
-                })}
-              </div>
+              {[
+                { label: '오전', list: slots.filter(s => s < 720) },
+                { label: '오후', list: slots.filter(s => s >= 720 && s < 1080) },
+                { label: '저녁', list: slots.filter(s => s >= 1080) },
+              ]
+                .filter(g => g.list.length > 0)
+                .map(g => (
+                  <div key={g.label}>
+                    <p className="mt-2.5 text-[11px] font-bold text-mint">{g.label}</p>
+                    <div className="mt-1 flex flex-wrap gap-2">
+                      {g.list.map(s => {
+                        const active = selected === s;
+                        return (
+                          <button
+                            key={s}
+                            type="button"
+                            onClick={() => onSelect(s)}
+                            className={`min-h-11 rounded-lg border px-3 text-sm font-semibold tabular-nums transition-opacity active:opacity-80 ${
+                              active ? 'border-fair bg-fair text-white' : 'border-line bg-white text-ink'
+                            }`}
+                          >
+                            {toHM(s)} – {toHM(s + need)}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
             </>
           )}
         </div>

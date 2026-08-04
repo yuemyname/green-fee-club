@@ -59,13 +59,13 @@ export function buildTimeline<R extends Reservation>(
   return segs;
 }
 
-/** 필요 시간이 들어가는 시작 가능 시각 목록 — 30분 단위, 구간당 최대 8개 */
+/** 필요 시간이 들어가는 시작 가능 시각 목록 — 30분 단위, 구간 전체 */
 export function slotsFor(timeline: Segment[], need: number): number[] {
   const out: number[] = [];
   for (const g of timeline) {
     if (g.type !== 'open' || g.end - g.start < need) continue;
     let s = Math.ceil(g.start / 30) * 30;
-    for (let n = 0; s + need <= g.end && n < 8; n++, s += 30) out.push(s);
+    for (; s + need <= g.end; s += 30) out.push(s);
   }
   return out;
 }

@@ -122,9 +122,12 @@ describe('slotsFor', () => {
     expect(slots[1]).toBe(540);
   });
 
-  it('구간당 최대 8개까지만 준다', () => {
+  it('빈 하루면 저녁까지 모든 시작 시각을 준다', () => {
     const segs = buildTimeline([], 1, 'd'); // 480~1440
-    expect(slotsFor(segs, 70)).toHaveLength(8);
+    const slots = slotsFor(segs, 70);
+    expect(slots[0]).toBe(480);
+    expect(slots[slots.length - 1]).toBe(1350); // 22:30 시작 (22:30+70분 ≤ 24:00)
+    expect(slots).toHaveLength(30);
   });
 
   it('종일 예약이면 슬롯이 없다', () => {

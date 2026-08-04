@@ -25,7 +25,7 @@ export default function MenuPage() {
 
   return (
     <div>
-      <Eyebrow>TWINVILL SCREEN</Eyebrow>
+      <Eyebrow>TWINVILL SCREEN GOLF</Eyebrow>
       <h1 className="mt-1 text-2xl font-black text-deep" style={{ letterSpacing: '-0.02em' }}>
         무엇을 할까요?
       </h1>
