@@ -1,6 +1,7 @@
 'use server';
 
 import { pool } from '@/lib/server/db';
+import { isOwner } from '@/lib/server/auth';
 import { STAMP_GOAL } from '@/lib/constants';
 import type { CouponUse, CustomerOverview } from '@/lib/types';
 
@@ -26,6 +27,7 @@ function toOverview(r: {
 }
 
 export async function listCustomers(): Promise<CustomerOverview[]> {
+  if (!(await isOwner())) throw new Error('UNAUTHORIZED');
   const { rows } = await pool().query(
     `${OVERVIEW_SQL} group by c.id order by c.created_at desc`,
   );
@@ -33,6 +35,7 @@ export async function listCustomers(): Promise<CustomerOverview[]> {
 }
 
 export async function findByLast4(last4: string): Promise<CustomerOverview | null> {
+  if (!(await isOwner())) throw new Error('UNAUTHORIZED');
   const { rows } = await pool().query(
     `${OVERVIEW_SQL} where c.last4 = $1 group by c.id`,
     [last4],
@@ -44,6 +47,7 @@ export async function createCustomer(
   name: string,
   phoneDigits: string,
 ): Promise<{ ok: true; customer: CustomerOverview } | { ok: false; error: string }> {
+  if (!(await isOwner())) return { ok: false, error: '권한이 없습니다.' };
   const trimmed = name.trim();
   if (trimmed.length < 1) return { ok: false, error: '이름을 입력해 주세요.' };
   if (!/^\d{11}$/.test(phoneDigits)) {
@@ -83,6 +87,7 @@ export async function addStamp(
   last4: string,
   date: string,
 ): Promise<{ ok: true; value: StampResult } | { ok: false; error: string }> {
+  if (!(await isOwner())) return { ok: false, error: '권한이 없습니다.' };
   const client = await pool().connect();
   try {
     await client.query('begin');

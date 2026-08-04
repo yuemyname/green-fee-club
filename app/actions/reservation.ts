@@ -1,8 +1,9 @@
 'use server';
 
 import { pool } from '@/lib/server/db';
+import { isOwner } from '@/lib/server/auth';
+import { insertReservation } from '@/lib/server/booking';
 import { STAMP_GOAL } from '@/lib/constants';
-import { needMin } from '@/lib/time';
 import type { Block, ReservationRow, Room } from '@/lib/types';
 
 export interface Board {
@@ -11,8 +12,9 @@ export interface Board {
   blocks: Block[]; // 해당 날짜에 적용되는 예약 불가 시간 (매일 반복 포함)
 }
 
-/** 예약 현황·방 예약 화면에 필요한 하루치 데이터 */
+/** 예약 현황·방 예약 화면에 필요한 하루치 데이터 (사장님 전용 — 고객 이름 포함) */
 export async function listBoard(date: string): Promise<Board> {
+  if (!(await isOwner())) throw new Error('UNAUTHORIZED');
   const [rooms, reservations, blocks] = await Promise.all([
     pool().query('select id, name, open_min, close_min from rooms order by id'),
     pool().query(
@@ -47,8 +49,7 @@ export interface BookingInput {
 export async function createReservation(
   input: BookingInput,
 ): Promise<{ ok: true; customerName: string } | { ok: false; error: string }> {
-  const need = needMin(input.people);
-  const end = input.start_min + need;
+  if (!(await isOwner())) return { ok: false, error: '권한이 없습니다.' };
   const client = await pool().connect();
   try {
     await client.query('begin');
@@ -58,76 +59,21 @@ export async function createReservation(
     ]);
 
     const cust = await client.query(
-      'select id, name, used_coupons from customers where last4 = $1 for update',
+      'select id, name from customers where last4 = $1',
       [input.last4],
     );
     if (!cust.rows.length) {
       await client.query('rollback');
       return { ok: false, error: '등록되지 않은 번호입니다. 고객 등록에서 먼저 추가해 주세요.' };
     }
-    const c = cust.rows[0];
 
-    const room = await client.query(
-      'select open_min, close_min from rooms where id = $1',
-      [input.room_id],
-    );
-    if (!room.rows.length) {
+    const err = await insertReservation(client, cust.rows[0].id, input);
+    if (err) {
       await client.query('rollback');
-      return { ok: false, error: '방을 찾을 수 없습니다.' };
+      return { ok: false, error: err };
     }
-    if (input.start_min < room.rows[0].open_min || end > room.rows[0].close_min) {
-      await client.query('rollback');
-      return { ok: false, error: '운영시간을 벗어난 시간입니다. 시간을 다시 골라주세요.' };
-    }
-
-    const blocked = await client.query(
-      `select 1 from blocks
-       where (room_id is null or room_id = $1)
-         and (date is null or date = $2)
-         and start_min < $3 and $4 < end_min
-       limit 1`,
-      [input.room_id, input.date, end, input.start_min],
-    );
-    if (blocked.rows.length) {
-      await client.query('rollback');
-      return { ok: false, error: '예약 불가 시간과 겹칩니다. 시간을 다시 골라주세요.' };
-    }
-
-    const overlap = await client.query(
-      `select 1 from reservations
-       where room_id = $1 and date = $2 and start_min < $3 and $4 < end_min
-       limit 1`,
-      [input.room_id, input.date, end, input.start_min],
-    );
-    if (overlap.rows.length) {
-      await client.query('rollback');
-      return { ok: false, error: '방금 다른 예약이 잡혔습니다. 시간을 다시 골라주세요.' };
-    }
-
-    if (input.use_free) {
-      const stamps = await client.query(
-        'select count(*)::int as total from stamps where customer_id = $1',
-        [c.id],
-      );
-      if (Math.floor(stamps.rows[0].total / STAMP_GOAL) - c.used_coupons < 1) {
-        await client.query('rollback');
-        return { ok: false, error: '사용 가능한 무료 예약권이 없습니다.' };
-      }
-      await client.query('update customers set used_coupons = used_coupons + 1 where id = $1', [c.id]);
-    }
-
-    // 무료 예약권 사용은 즉시 입금 확인(point), 그 외에는 입금 대기.
-    // 도장은 예약 시점이 아니라 입금 확인 시점에 적립된다.
-    await client.query(
-      `insert into reservations (date, room_id, start_min, end_min, customer_id, people, is_free, payment, paid_at)
-       values ($1,$2,$3,$4,$5,$6,$7,$8, case when $8 = 'pending' then null else now() end)`,
-      [
-        input.date, input.room_id, input.start_min, end, c.id, input.people,
-        input.use_free, input.use_free ? 'point' : 'pending',
-      ],
-    );
     await client.query('commit');
-    return { ok: true, customerName: c.name };
+    return { ok: true, customerName: cust.rows[0].name };
   } catch (e) {
     await client.query('rollback').catch(() => {});
     throw e;
@@ -148,6 +94,7 @@ export async function confirmPayment(
   reservationId: number,
   method: 'manual' | 'point',
 ): Promise<{ ok: true; value: ConfirmResult } | { ok: false; error: string }> {
+  if (!(await isOwner())) return { ok: false, error: '권한이 없습니다.' };
   const client = await pool().connect();
   try {
     await client.query('begin');

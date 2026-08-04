@@ -1,11 +1,13 @@
 'use server';
 
 import { pool } from '@/lib/server/db';
+import { isOwner } from '@/lib/server/auth';
 import type { Block, Room } from '@/lib/types';
 
 type Result = { ok: true } | { ok: false; error: string };
 
 export async function listRooms(): Promise<Room[]> {
+  if (!(await isOwner())) throw new Error('UNAUTHORIZED');
   const { rows } = await pool().query(
     'select id, name, open_min, close_min from rooms order by id',
   );
@@ -21,6 +23,7 @@ function validRoom(name: string, open: number, close: number): string | null {
 }
 
 export async function createRoom(name: string, open_min: number, close_min: number): Promise<Result> {
+  if (!(await isOwner())) return { ok: false, error: '권한이 없습니다.' };
   const err = validRoom(name, open_min, close_min);
   if (err) return { ok: false, error: err };
   await pool().query('insert into rooms (name, open_min, close_min) values ($1,$2,$3)', [
@@ -32,6 +35,7 @@ export async function createRoom(name: string, open_min: number, close_min: numb
 export async function updateRoom(
   id: number, name: string, open_min: number, close_min: number,
 ): Promise<Result> {
+  if (!(await isOwner())) return { ok: false, error: '권한이 없습니다.' };
   const err = validRoom(name, open_min, close_min);
   if (err) return { ok: false, error: err };
   const res = await pool().query(
@@ -43,6 +47,7 @@ export async function updateRoom(
 }
 
 export async function deleteRoom(id: number): Promise<Result> {
+  if (!(await isOwner())) return { ok: false, error: '권한이 없습니다.' };
   const used = await pool().query(
     'select count(*)::int as n from reservations where room_id = $1',
     [id],
@@ -58,6 +63,7 @@ export async function deleteRoom(id: number): Promise<Result> {
 export type BlockRow = Block & { room_name: string | null };
 
 export async function listBlocks(): Promise<BlockRow[]> {
+  if (!(await isOwner())) throw new Error('UNAUTHORIZED');
   const { rows } = await pool().query(
     `select b.id, b.room_id, b.label, b.date, b.start_min, b.end_min, r.name as room_name
      from blocks b
@@ -74,6 +80,7 @@ export async function createBlock(input: {
   start_min: number;
   end_min: number;
 }): Promise<Result> {
+  if (!(await isOwner())) return { ok: false, error: '권한이 없습니다.' };
   if (!(input.start_min >= 0 && input.end_min <= 1440 && input.start_min < input.end_min)) {
     return { ok: false, error: '시간이 올바르지 않습니다. 시작이 종료보다 빨라야 합니다.' };
   }
@@ -88,6 +95,7 @@ export async function createBlock(input: {
 }
 
 export async function deleteBlock(id: number): Promise<Result> {
+  if (!(await isOwner())) return { ok: false, error: '권한이 없습니다.' };
   const res = await pool().query('delete from blocks where id = $1', [id]);
   if (!res.rowCount) return { ok: false, error: '항목을 찾을 수 없습니다.' };
   return { ok: true };
