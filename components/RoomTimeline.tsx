@@ -96,12 +96,12 @@ export default function RoomTimeline({
               <span className="flex items-center gap-1.5 text-xs font-semibold text-sub tabular-nums">
                 {r.customer_name} {r.people}명
                 {r.payment === 'point' && (
-                  <span className="rounded-md bg-flag px-1.5 py-0.5 text-[11px] font-bold text-white">
+                  <span className="rounded-md bg-flag px-1.5 py-0.5 text-[11px] font-bold text-white whitespace-nowrap">
                     무료
                   </span>
                 )}
                 {pending && (
-                  <span className="rounded-md border border-line px-1.5 py-0.5 text-[11px] font-bold text-deep">
+                  <span className="rounded-md border border-line px-1.5 py-0.5 text-[11px] font-bold text-deep whitespace-nowrap">
                     입금 대기
                   </span>
                 )}

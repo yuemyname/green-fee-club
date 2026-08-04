@@ -3,21 +3,32 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { getMyPage, myCancelReservation, type MyPage } from '@/app/actions/my';
+import {
+  getMyPage, myCancelReservation, myMonthReservedDates,
+  type MyPage, type MyReservation,
+} from '@/app/actions/my';
 import { STAMP_GOAL } from '@/lib/constants';
 import { fmtDate, toHM, todayStr } from '@/lib/time';
 import type { CouponState } from '@/components/StampCard';
 import Btn from '@/components/ui/Btn';
 import Card from '@/components/ui/Card';
 import Eyebrow from '@/components/ui/Eyebrow';
+import MonthCalendar from '@/components/MonthCalendar';
 import StampCard from '@/components/StampCard';
 import { useToast } from '@/components/ui/Toast';
 
 export default function MyHomePage() {
   const [data, setData] = useState<MyPage | null>(null);
+  const [date, setDate] = useState(todayStr());
+  const [month, setMonth] = useState(todayStr().slice(0, 6));
+  const [marks, setMarks] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const router = useRouter();
   const toast = useToast();
+
+  const loadMarks = useCallback((m: string) => {
+    myMonthReservedDates(m).then(d => setMarks(new Set(d))).catch(() => {});
+  }, []);
 
   const refresh = useCallback(() => {
     getMyPage().then(d => {
@@ -27,6 +38,7 @@ export default function MyHomePage() {
   }, [router]);
 
   useEffect(refresh, [refresh]);
+  useEffect(() => loadMarks(month), [month, loadMarks]);
 
   const cancel = async (id: number) => {
     if (busy || !window.confirm('이 예약을 취소할까요?')) return;
@@ -39,6 +51,7 @@ export default function MyHomePage() {
       }
       toast(res.refunded ? '예약이 취소되고 무료 예약권이 반환되었습니다.' : '예약이 취소되었습니다.');
       refresh();
+      loadMarks(month);
     } finally {
       setBusy(false);
     }
@@ -46,11 +59,49 @@ export default function MyHomePage() {
 
   if (!data) return null;
 
+  const ResCard = ({ r }: { r: MyReservation }) => (
+    <Card>
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-bold tabular-nums">
+          {fmtDate(r.date)} · {r.room_name ?? ''} · {toHM(r.start_min)}–{toHM(r.end_min)}
+        </p>
+        <span className="flex items-center gap-1.5 text-xs font-semibold text-sub tabular-nums">
+          {r.people}명
+          {r.payment === 'point' && (
+            <span className="rounded-md bg-flag px-1.5 py-0.5 text-[11px] font-bold text-white whitespace-nowrap">무료</span>
+          )}
+          {r.payment === 'pending' && (
+            <span className="rounded-md border border-line px-1.5 py-0.5 text-[11px] font-bold text-deep whitespace-nowrap">입금 대기</span>
+          )}
+        </span>
+      </div>
+      {r.payment !== 'manual' ? (
+        <div className="mt-3 flex gap-2">
+          <Btn
+            tone="ghost"
+            onClick={() => router.push(`/my/book?edit=${r.id}`)}
+            disabled={busy}
+            className="flex-1"
+          >
+            변경
+          </Btn>
+          <Btn tone="ghost" onClick={() => cancel(r.id)} disabled={busy} className="flex-1">
+            취소
+          </Btn>
+        </div>
+      ) : (
+        <p className="mt-2 text-xs text-sub">입금 확인 완료 — 변경·취소는 매장에 문의해 주세요.</p>
+      )}
+    </Card>
+  );
+
   const today = todayStr();
+  const selectedDay = data.reservations
+    .filter(r => r.date === date)
+    .sort((a, b) => a.start_min - b.start_min);
   const upcoming = data.reservations
-    .filter(r => r.date >= today)
+    .filter(r => r.date >= today && r.date !== date)
     .sort((a, b) => (a.date === b.date ? a.start_min - b.start_min : a.date < b.date ? -1 : 1));
-  const pastCount = data.reservations.length - upcoming.length;
 
   // 스탬프 카드 (10개 단위) + 사용된 쿠폰 매칭
   const cards: string[][] = [];
@@ -89,52 +140,35 @@ export default function MyHomePage() {
       </Link>
 
       <section className="mt-8">
-        <h2 className="text-sm font-bold text-deep">
-          내 예약 <span className="tabular-nums">{upcoming.length}</span>건
-        </h2>
-        <div className="mt-2 space-y-2">
-          {upcoming.length === 0 && (
-            <Card><p className="text-sm text-sub">예정된 예약이 없습니다.</p></Card>
-          )}
-          {upcoming.map(r => (
-            <Card key={r.id}>
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-bold tabular-nums">
-                  {fmtDate(r.date)} · {r.room_name ?? ''} · {toHM(r.start_min)}–{toHM(r.end_min)}
-                </p>
-                <span className="flex items-center gap-1.5 text-xs font-semibold text-sub tabular-nums">
-                  {r.people}명
-                  {r.payment === 'point' && (
-                    <span className="rounded-md bg-flag px-1.5 py-0.5 text-[11px] font-bold text-white">무료</span>
-                  )}
-                  {r.payment === 'pending' && (
-                    <span className="rounded-md border border-line px-1.5 py-0.5 text-[11px] font-bold text-deep">입금 대기</span>
-                  )}
-                </span>
-              </div>
-              {r.payment !== 'manual' ? (
-                <div className="mt-3 flex gap-2">
-                  <Btn
-                    tone="ghost"
-                    onClick={() => router.push(`/my/book?edit=${r.id}`)}
-                    disabled={busy}
-                    className="flex-1"
-                  >
-                    변경
-                  </Btn>
-                  <Btn tone="ghost" onClick={() => cancel(r.id)} disabled={busy} className="flex-1">
-                    취소
-                  </Btn>
-                </div>
-              ) : (
-                <p className="mt-2 text-xs text-sub">입금 확인 완료 — 변경·취소는 매장에 문의해 주세요.</p>
-              )}
-            </Card>
-          ))}
-          {pastCount > 0 && (
-            <p className="text-xs text-sub">지난 예약 {pastCount}건</p>
-          )}
+        <h2 className="text-sm font-bold text-deep">내 예약 달력</h2>
+        <div className="mt-2">
+          <MonthCalendar
+            month={month}
+            value={date}
+            marked={marks}
+            onSelect={setDate}
+            onMonthChange={setMonth}
+          />
         </div>
+
+        <h3 className="mt-4 text-sm font-bold text-deep tabular-nums">{fmtDate(date)} 내 예약</h3>
+        <div className="mt-2 space-y-2">
+          {selectedDay.length === 0 && (
+            <Card><p className="text-sm text-sub">이 날짜에는 예약이 없습니다.</p></Card>
+          )}
+          {selectedDay.map(r => <ResCard key={r.id} r={r} />)}
+        </div>
+
+        {upcoming.length > 0 && (
+          <>
+            <h3 className="mt-6 text-sm font-bold text-deep">
+              다가오는 다른 예약 <span className="tabular-nums">{upcoming.length}</span>건
+            </h3>
+            <div className="mt-2 space-y-2">
+              {upcoming.map(r => <ResCard key={r.id} r={r} />)}
+            </div>
+          </>
+        )}
       </section>
 
       <section className="mt-8">

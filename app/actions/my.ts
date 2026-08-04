@@ -124,6 +124,18 @@ export async function getMyPage(): Promise<MyPage | null> {
   };
 }
 
+/** 해당 월(yyyymm)에서 내 예약이 있는 날짜 목록 */
+export async function myMonthReservedDates(month: string): Promise<string[]> {
+  const cid = await customerId();
+  if (cid === null || !/^\d{6}$/.test(month)) return [];
+  const { rows } = await pool().query(
+    `select distinct date from reservations
+     where customer_id = $1 and date >= $2 || '01' and date <= $2 || '31'`,
+    [cid, month],
+  );
+  return rows.map(r => r.date);
+}
+
 export interface MyBoard {
   rooms: Room[];
   blocks: Block[];
