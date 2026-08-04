@@ -38,6 +38,23 @@ export async function listAdmins(): Promise<AdminRow[]> {
   return rows.map(r => ({ id: r.id, username: r.username, isMe: r.id === me }));
 }
 
+/** 관리자 아이디 변경 */
+export async function changeAdminUsername(id: number, newUsername: string): Promise<Result> {
+  if (!(await isOwner())) return { ok: false, error: '권한이 없습니다.' };
+  const name = newUsername.trim();
+  if (name.length < 3) return { ok: false, error: '아이디는 3자 이상으로 해주세요.' };
+  try {
+    const res = await pool().query('update admins set username = $2 where id = $1', [id, name]);
+    if (!res.rowCount) return { ok: false, error: '관리자를 찾을 수 없습니다.' };
+    return { ok: true };
+  } catch (e: unknown) {
+    if (typeof e === 'object' && e !== null && (e as { code?: string }).code === '23505') {
+      return { ok: false, error: '이미 있는 아이디입니다.' };
+    }
+    throw e;
+  }
+}
+
 /** 관리자 비밀번호 변경 — 로그인한 관리자는 매장 계정 3개 모두 변경 가능 */
 export async function changeAdminPassword(id: number, newPassword: string): Promise<Result> {
   if (!(await isOwner())) return { ok: false, error: '권한이 없습니다.' };
