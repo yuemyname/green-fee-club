@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
   addStamp, getCustomerDetail, type CustomerDetail,
 } from '@/app/actions/customer';
@@ -19,24 +19,28 @@ export default function PointPage() {
   const [busy, setBusy] = useState(false);
   const [detail, setDetail] = useState<CustomerDetail | null>(null);
   const [notFound, setNotFound] = useState(false);
+  const [looked, setLooked] = useState(false); // 현재 번호로 조회를 마쳤는지
 
-  // 4자리 입력되면 적립 전에 현재 포인트를 먼저 조회해 보여준다
-  useEffect(() => {
-    if (last4.length !== 4) {
-      setDetail(null);
-      setNotFound(false);
-      return;
-    }
-    let alive = true;
-    getCustomerDetail(last4).then(d => {
-      if (!alive) return;
+  const changeLast4 = (v: string) => {
+    setLast4(v.replace(/\D/g, ''));
+    setDetail(null);
+    setNotFound(false);
+    setLooked(false);
+  };
+
+  // 조회 — 도장을 찍지 않고 현재 포인트만 보여준다
+  const lookup = async () => {
+    if (last4.length !== 4 || looked || busy) return;
+    setBusy(true);
+    try {
+      const d = await getCustomerDetail(last4);
       setDetail(d);
       setNotFound(d === null);
-    }).catch(() => {});
-    return () => {
-      alive = false;
-    };
-  }, [last4]);
+      setLooked(true);
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const stamp = async () => {
     if (!detail || busy) return;
@@ -90,7 +94,7 @@ export default function PointPage() {
         포인트 적립
       </h1>
       <p className="mt-2 text-sm text-sub">
-        번호를 입력하면 현재 포인트가 먼저 조회되고, 적립 버튼을 눌러야 도장이 찍힙니다.
+        번호 입력 → 조회로 현재 포인트를 확인한 뒤 → 적립을 눌러야 도장이 찍힙니다.
       </p>
 
       <div className="mt-5 flex gap-2">
@@ -99,12 +103,15 @@ export default function PointPage() {
           inputMode="numeric"
           maxLength={4}
           value={last4}
-          onChange={e => setLast4(e.target.value.replace(/\D/g, ''))}
-          onKeyDown={e => e.key === 'Enter' && stamp()}
+          onChange={e => changeLast4(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && (detail ? stamp() : lookup())}
           placeholder="뒤 4자리"
-          className="h-12 flex-1 rounded-lg border border-line bg-white px-4 text-center text-xl font-bold tracking-widest tabular-nums outline-none placeholder:text-base placeholder:font-normal placeholder:tracking-normal placeholder:text-sub focus:border-fair"
+          className="h-12 min-w-0 flex-1 rounded-lg border border-line bg-white px-3 text-center text-xl font-bold tracking-widest tabular-nums outline-none placeholder:text-base placeholder:font-normal placeholder:tracking-normal placeholder:text-sub focus:border-fair"
         />
-        <Btn onClick={stamp} disabled={!detail || busy} className="px-6">
+        <Btn tone="ghost" onClick={lookup} disabled={last4.length !== 4 || looked || busy}>
+          조회
+        </Btn>
+        <Btn onClick={stamp} disabled={!detail || busy}>
           적립
         </Btn>
       </div>
