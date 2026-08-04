@@ -59,8 +59,9 @@ export default function MyHomePage() {
 
   if (!data) return null;
 
+  // 선택한 날짜의 예약 — 눈에 띄게 turf 배경 + fair 테두리로 강조
   const ResCard = ({ r }: { r: MyReservation }) => (
-    <Card>
+    <div className="rounded-xl border-2 border-fair bg-turf p-4">
       <div className="flex items-center justify-between">
         <p className="text-sm font-bold tabular-nums">
           {fmtDate(r.date)} · {r.room_name ?? ''} · {toHM(r.start_min)}–{toHM(r.end_min)}
@@ -92,16 +93,12 @@ export default function MyHomePage() {
       ) : (
         <p className="mt-2 text-xs text-sub">입금 확인 완료 — 변경·취소는 매장에 문의해 주세요.</p>
       )}
-    </Card>
+    </div>
   );
 
-  const today = todayStr();
   const selectedDay = data.reservations
     .filter(r => r.date === date)
     .sort((a, b) => a.start_min - b.start_min);
-  const upcoming = data.reservations
-    .filter(r => r.date >= today && r.date !== date)
-    .sort((a, b) => (a.date === b.date ? a.start_min - b.start_min : a.date < b.date ? -1 : 1));
 
   // 스탬프 카드 (10개 단위) + 사용된 쿠폰 매칭
   const cards: string[][] = [];
@@ -158,17 +155,6 @@ export default function MyHomePage() {
           )}
           {selectedDay.map(r => <ResCard key={r.id} r={r} />)}
         </div>
-
-        {upcoming.length > 0 && (
-          <>
-            <h3 className="mt-6 text-sm font-bold text-deep">
-              다가오는 다른 예약 <span className="tabular-nums">{upcoming.length}</span>건
-            </h3>
-            <div className="mt-2 space-y-2">
-              {upcoming.map(r => <ResCard key={r.id} r={r} />)}
-            </div>
-          </>
-        )}
       </section>
 
       <section className="mt-8">
