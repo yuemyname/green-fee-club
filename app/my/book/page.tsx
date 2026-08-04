@@ -10,7 +10,6 @@ import { buildTimeline, slotsFor } from '@/lib/timeline';
 import { fmtDate, fmtDur, needMin, toHM, todayStr } from '@/lib/time';
 import type { Reservation } from '@/lib/types';
 import Btn from '@/components/ui/Btn';
-import Card from '@/components/ui/Card';
 import DatePicker from '@/components/ui/DatePicker';
 import Eyebrow from '@/components/ui/Eyebrow';
 import SlotPicker from '@/components/SlotPicker';
@@ -204,8 +203,11 @@ function MyBookInner() {
         </div>
       )}
 
+      {/* 확정 시트 — 시간을 선택하면 하단에 고정으로 떠서 스크롤 없이 예약 */}
+      {board && selection && selectedRoom && <div className="h-56" />}
       {board && selection && selectedRoom && (
-        <Card className="mt-4 space-y-4 bg-turf">
+        <div className="fixed inset-x-0 bottom-0 z-40 rounded-t-xl border-t border-line bg-turf">
+          <div className="mx-auto max-h-[70dvh] max-w-xl space-y-4 overflow-y-auto px-4 pb-[calc(env(safe-area-inset-bottom,0px)+16px)] pt-4">
           <p className="text-base font-black text-deep tabular-nums">
             {fmtDate(date)} · {selectedRoom.name} · {toHM(selection.start)}–{toHM(selection.start + need)}
           </p>
@@ -231,7 +233,8 @@ function MyBookInner() {
               {editId ? '변경하기' : '예약하기'}
             </Btn>
           </div>
-        </Card>
+          </div>
+        </div>
       )}
     </div>
   );
