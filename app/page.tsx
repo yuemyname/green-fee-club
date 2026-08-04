@@ -43,6 +43,13 @@ export default function MenuPage() {
         ))}
       </div>
 
+      <Link
+        href="/admins"
+        className="mt-3 flex min-h-11 items-center justify-center rounded-xl border border-line bg-white text-sm font-semibold text-sub transition-opacity active:opacity-80"
+      >
+        관리자 계정 관리
+      </Link>
+
       <section className="mt-8">
         <h2 className="text-sm font-bold text-deep">무료 예약권 보유 고객</h2>
         <div className="mt-2 space-y-2">

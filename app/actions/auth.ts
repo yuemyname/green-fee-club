@@ -5,19 +5,18 @@ import {
   adminId, clearAdminSession, hashPassword, isOwner, setAdminSession, verifyPassword,
 } from '@/lib/server/auth';
 
-export async function login(
-  username: string,
-  password: string,
-): Promise<{ ok: boolean }> {
+/** 비밀번호만으로 로그인 — 매장 관리자 3개 중 일치하는 계정으로 세션 발급 */
+export async function login(password: string): Promise<{ ok: boolean }> {
   const { rows } = await pool().query(
-    'select id, password_hash from admins where username = $1',
-    [username.trim()],
+    'select id, password_hash from admins order by id',
   );
-  if (!rows.length || !verifyPassword(password, rows[0].password_hash)) {
-    return { ok: false };
+  for (const r of rows) {
+    if (verifyPassword(password, r.password_hash)) {
+      await setAdminSession(r.id);
+      return { ok: true };
+    }
   }
-  await setAdminSession(rows[0].id);
-  return { ok: true };
+  return { ok: false };
 }
 
 export async function logout(): Promise<void> {
