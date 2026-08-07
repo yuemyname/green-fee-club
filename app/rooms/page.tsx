@@ -101,18 +101,19 @@ function BlockEditor({
           ))}
         </div>
       )}
-      <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-1">
         <input
           aria-label={`${idPrefix} 예약 불가 라벨`}
           value={label}
           onChange={e => setLabel(e.target.value)}
+          maxLength={10}
           placeholder="점심시간"
-          className="h-11 min-w-0 flex-1 rounded-lg border border-line bg-white px-2 text-sm outline-none placeholder:text-sub focus:border-fair"
+          className="h-11 w-28 shrink-0 rounded-lg border border-line bg-white px-1.5 text-sm outline-none placeholder:text-sub focus:border-fair"
         />
         <TimeSel label={`${idPrefix} 불가 시작`} value={start} onChange={setStart} compact />
         <span className="shrink-0 text-xs text-sub">–</span>
         <TimeSel label={`${idPrefix} 불가 종료`} value={end} onChange={setEnd} compact />
-        <Btn tone="ghost" onClick={add} className="shrink-0 px-2.5">추가</Btn>
+        <Btn tone="ghost" onClick={add} className="ml-auto shrink-0 px-2.5">추가</Btn>
       </div>
       {onApplyAll && (
         <div className="mt-2 flex justify-end">
