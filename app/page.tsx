@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { listCustomers } from '@/app/actions/customer';
-import type { CustomerOverview } from '@/lib/types';
+import { listBoard, type Board } from '@/app/actions/reservation';
+import { fmtDate, toHM, todayStr } from '@/lib/time';
 import Eyebrow from '@/components/ui/Eyebrow';
 import Card from '@/components/ui/Card';
 
@@ -15,13 +15,19 @@ const MENUS = [
 ];
 
 export default function MenuPage() {
-  const [customers, setCustomers] = useState<CustomerOverview[] | null>(null);
+  const [board, setBoard] = useState<Board | null>(null);
+  const today = todayStr();
 
   useEffect(() => {
-    listCustomers().then(setCustomers).catch(() => setCustomers([]));
-  }, []);
+    listBoard(today).then(setBoard).catch(() => {});
+  }, [today]);
 
-  const holders = customers?.filter(c => c.coupons > 0) ?? [];
+  const roomName = (id: number) => board?.rooms.find(r => r.id === id)?.name ?? '';
+  const list = board
+    ? [...board.reservations].sort((a, b) =>
+        a.start_min === b.start_min ? a.room_id - b.room_id : a.start_min - b.start_min,
+      )
+    : [];
 
   return (
     <div>
@@ -51,21 +57,42 @@ export default function MenuPage() {
       </Link>
 
       <section className="mt-8">
-        <h2 className="text-sm font-bold text-deep">무료 예약권 보유 고객</h2>
+        <h2 className="text-sm font-bold text-deep tabular-nums">
+          오늘 예약 {fmtDate(today)}
+          {board && <span className="text-sub"> · {list.length}건</span>}
+        </h2>
         <div className="mt-2 space-y-2">
-          {customers && holders.length === 0 && (
-            <Card>
-              <p className="text-sm text-sub">아직 카드를 채운 고객이 없습니다.</p>
-            </Card>
+          {board && list.length === 0 && (
+            <Card><p className="text-sm text-sub">오늘 예약이 없습니다.</p></Card>
           )}
-          {holders.map(c => (
-            <Card key={c.id} className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-bold">{c.name}</p>
-                <p className="mt-0.5 text-xs text-sub tabular-nums">{c.phone}</p>
-              </div>
-              <span className="text-sm font-black text-flag tabular-nums">무료 {c.coupons}회</span>
-            </Card>
+          {list.map(r => (
+            <Link key={r.id} href="/status" className="block">
+              <Card className="flex items-center justify-between transition-opacity active:opacity-80">
+                <div>
+                  <p className="text-sm font-bold tabular-nums">
+                    {toHM(r.start_min)} – {toHM(r.end_min)}
+                  </p>
+                  <p className="mt-0.5 text-xs text-sub tabular-nums">
+                    {roomName(r.room_id)} · {r.customer_name} {r.people}명
+                  </p>
+                </div>
+                <span className="flex items-center gap-1.5">
+                  {r.payment === 'point' && (
+                    <span className="rounded-md bg-flag px-1.5 py-0.5 text-[11px] font-bold text-white whitespace-nowrap">
+                      무료
+                    </span>
+                  )}
+                  {r.payment === 'pending' && (
+                    <span className="rounded-md border border-line px-1.5 py-0.5 text-[11px] font-bold text-deep whitespace-nowrap">
+                      입금 대기
+                    </span>
+                  )}
+                  {r.payment === 'manual' && (
+                    <span className="text-xs font-semibold text-fair whitespace-nowrap">입금 확인</span>
+                  )}
+                </span>
+              </Card>
+            </Link>
           ))}
         </div>
       </section>

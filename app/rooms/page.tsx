@@ -107,7 +107,7 @@ function BlockEditor({
           value={label}
           onChange={e => setLabel(e.target.value)}
           maxLength={10}
-          placeholder="점심시간"
+          placeholder="불가 사유"
           className="h-11 w-28 shrink-0 rounded-lg border border-line bg-white px-1.5 text-sm outline-none placeholder:text-sub focus:border-fair"
         />
         <TimeSel label={`${idPrefix} 불가 시작`} value={start} onChange={setStart} compact />
@@ -574,7 +574,7 @@ export default function RoomsPage() {
             aria-label="예약 불가 라벨"
             value={blLabel}
             onChange={e => setBlLabel(e.target.value)}
-            placeholder="점심시간"
+            placeholder="불가 사유"
             className="h-11 w-full rounded-lg border border-line bg-white px-3 text-base outline-none placeholder:text-sub focus:border-fair"
           />
           <select
