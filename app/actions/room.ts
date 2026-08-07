@@ -22,14 +22,50 @@ function validRoom(name: string, open: number, close: number): string | null {
   return null;
 }
 
-export async function createRoom(name: string, open_min: number, close_min: number): Promise<Result> {
+/** 새 방 등록 시 함께 넣을 예약 불가 시간 (이 방에만 적용, 매일 반복) */
+export interface NewRoomBlock {
+  label: string;
+  start_min: number;
+  end_min: number;
+}
+
+export async function createRoom(
+  name: string,
+  open_min: number,
+  close_min: number,
+  blocks: NewRoomBlock[] = [],
+): Promise<Result> {
   if (!(await isOwner())) return { ok: false, error: '권한이 없습니다.' };
   const err = validRoom(name, open_min, close_min);
   if (err) return { ok: false, error: err };
-  await pool().query('insert into rooms (name, open_min, close_min) values ($1,$2,$3)', [
-    name.trim(), open_min, close_min,
-  ]);
-  return { ok: true };
+  for (const b of blocks) {
+    if (!(b.start_min >= 0 && b.end_min <= 1440 && b.start_min < b.end_min)) {
+      return { ok: false, error: '예약 불가 시간이 올바르지 않습니다.' };
+    }
+  }
+
+  const client = await pool().connect();
+  try {
+    await client.query('begin');
+    const res = await client.query(
+      'insert into rooms (name, open_min, close_min) values ($1,$2,$3) returning id',
+      [name.trim(), open_min, close_min],
+    );
+    const roomId = res.rows[0].id;
+    for (const b of blocks) {
+      await client.query(
+        'insert into blocks (room_id, label, date, start_min, end_min) values ($1,$2,null,$3,$4)',
+        [roomId, b.label.trim() || '예약 불가', b.start_min, b.end_min],
+      );
+    }
+    await client.query('commit');
+    return { ok: true };
+  } catch (e) {
+    await client.query('rollback').catch(() => {});
+    throw e;
+  } finally {
+    client.release();
+  }
 }
 
 export async function updateRoom(

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import {
   createBlock, createRoom, deleteBlock, deleteRoom, listBlocks, listRooms,
-  updateRoom, type BlockRow,
+  updateRoom, type BlockRow, type NewRoomBlock,
 } from '@/app/actions/room';
 import { fmtDate, toHM, todayStr } from '@/lib/time';
 import type { Room } from '@/lib/types';
@@ -55,7 +55,7 @@ function RoomEditor({
     setBusy(true);
     try {
       const res = await updateRoom(room.id, name, open, close);
-      toast(res.ok ? `${name.trim()}이(가) 저장되었습니다.` : res.error);
+      toast(res.ok ? `${name.trim()}이(가) 변경되었습니다.` : res.error);
       if (res.ok) onSaved();
     } finally {
       setBusy(false);
@@ -90,7 +90,7 @@ function RoomEditor({
       </div>
       <div className="flex gap-2">
         <Btn tone="ghost" onClick={remove} disabled={busy} className="flex-1">삭제</Btn>
-        <Btn onClick={save} disabled={busy} className="flex-1">저장</Btn>
+        <Btn onClick={save} disabled={busy} className="flex-1">변경</Btn>
       </div>
     </Card>
   );
@@ -102,12 +102,16 @@ export default function RoomsPage() {
   const [blocks, setBlocks] = useState<BlockRow[] | null>(null);
   const [busy, setBusy] = useState(false);
 
-  // 방 추가 폼
+  // 신규 방 등록 폼
   const [newName, setNewName] = useState('');
   const [newOpen, setNewOpen] = useState(480);
   const [newClose, setNewClose] = useState(1440);
+  const [newBlocks, setNewBlocks] = useState<NewRoomBlock[]>([]);
+  const [nbLabel, setNbLabel] = useState('');
+  const [nbStart, setNbStart] = useState(720);
+  const [nbEnd, setNbEnd] = useState(780);
 
-  // 예약 불가 시간 추가 폼
+  // 예약 불가 시간 추가 폼 (기존 방 대상)
   const [blLabel, setBlLabel] = useState('');
   const [blRoom, setBlRoom] = useState<'all' | number>('all');
   const [blDaily, setBlDaily] = useState(true);
@@ -121,14 +125,27 @@ export default function RoomsPage() {
   };
   useEffect(refresh, []);
 
+  const stageBlock = () => {
+    if (!(nbStart < nbEnd)) {
+      toast('시간이 올바르지 않습니다. 시작이 종료보다 빨라야 합니다.');
+      return;
+    }
+    setNewBlocks(list => [
+      ...list,
+      { label: nbLabel.trim() || '예약 불가', start_min: nbStart, end_min: nbEnd },
+    ]);
+    setNbLabel('');
+  };
+
   const addRoom = async () => {
     if (busy) return;
     setBusy(true);
     try {
-      const res = await createRoom(newName, newOpen, newClose);
+      const res = await createRoom(newName, newOpen, newClose, newBlocks);
       toast(res.ok ? `${newName.trim()}이(가) 추가되었습니다.` : res.error);
       if (res.ok) {
         setNewName('');
+        setNewBlocks([]);
         refresh();
       }
     } finally {
@@ -176,30 +193,80 @@ export default function RoomsPage() {
         방 관리
       </h1>
 
-      <section className="mt-5 space-y-3">
-        {rooms?.map(r => (
-          <RoomEditor key={`${r.id}-${r.name}-${r.open_min}-${r.close_min}`} room={r} onSaved={refresh} onDeleted={refresh} />
-        ))}
-
-        <Card className="space-y-3 bg-turf">
-          <p className="text-sm font-bold text-deep">새 방 추가</p>
-          <input
-            aria-label="새 방 이름"
-            value={newName}
-            onChange={e => setNewName(e.target.value)}
-            placeholder="3번방"
-            className="h-11 w-full rounded-lg border border-line bg-white px-3 text-base outline-none placeholder:text-sub focus:border-fair"
-          />
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-sub">운영시간</span>
-            <TimeSel label="새 방 운영 시작" value={newOpen} onChange={setNewOpen} />
-            <span className="text-sub">–</span>
-            <TimeSel label="새 방 운영 종료" value={newClose} onChange={setNewClose} />
+      {/* 1. 신규 방 등록 — 운영시간과 이 방 전용 예약 불가 시간을 함께 설정 */}
+      <section className="mt-5">
+        <h2 className="text-sm font-bold text-deep">신규 방 등록</h2>
+        <Card className="mt-2 space-y-4 bg-turf">
+          <div>
+            <span className="mb-1.5 block text-xs font-semibold text-sub">방 이름</span>
+            <input
+              aria-label="새 방 이름"
+              value={newName}
+              onChange={e => setNewName(e.target.value)}
+              placeholder="3번방"
+              className="h-11 w-full rounded-lg border border-line bg-white px-3 text-base outline-none placeholder:text-sub focus:border-fair"
+            />
           </div>
-          <Btn onClick={addRoom} disabled={busy || !newName.trim()} className="w-full">방 추가</Btn>
+
+          <div>
+            <span className="mb-1.5 block text-xs font-semibold text-sub">운영 시간</span>
+            <div className="flex items-center gap-2">
+              <TimeSel label="새 방 운영 시작" value={newOpen} onChange={setNewOpen} />
+              <span className="text-sub">–</span>
+              <TimeSel label="새 방 운영 종료" value={newClose} onChange={setNewClose} />
+            </div>
+          </div>
+
+          <div>
+            <span className="mb-1.5 block text-xs font-semibold text-sub">
+              예약 불가 시간 <span className="font-normal">(이 방에 매일 적용)</span>
+            </span>
+            {newBlocks.length > 0 && (
+              <div className="mb-2 space-y-1.5">
+                {newBlocks.map((b, i) => (
+                  <div
+                    key={i}
+                    className="flex min-h-11 items-center justify-between rounded-lg border border-line bg-white px-3"
+                  >
+                    <span className="text-sm font-semibold tabular-nums">
+                      {b.label} · {toHM(b.start_min)} – {toHM(b.end_min)}
+                    </span>
+                    <button
+                      type="button"
+                      aria-label={`${b.label} 제거`}
+                      onClick={() => setNewBlocks(list => list.filter((_, j) => j !== i))}
+                      className="px-2 text-sm font-bold text-sub"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <input
+              aria-label="새 방 예약 불가 라벨"
+              value={nbLabel}
+              onChange={e => setNbLabel(e.target.value)}
+              placeholder="점심시간"
+              className="h-11 w-full rounded-lg border border-line bg-white px-3 text-base outline-none placeholder:text-sub focus:border-fair"
+            />
+            <div className="mt-2 flex items-center gap-2">
+              <TimeSel label="새 방 불가 시작" value={nbStart} onChange={setNbStart} />
+              <span className="text-sub">–</span>
+              <TimeSel label="새 방 불가 종료" value={nbEnd} onChange={setNbEnd} />
+              <Btn tone="ghost" onClick={stageBlock} className="ml-auto">
+                + 추가
+              </Btn>
+            </div>
+          </div>
+
+          <Btn onClick={addRoom} disabled={busy || !newName.trim()} className="w-full">
+            방 등록
+          </Btn>
         </Card>
       </section>
 
+      {/* 2. 예약 불가 시간 — 전체 방/특정 방, 매일/특정 날짜 */}
       <section className="mt-8">
         <h2 className="text-sm font-bold text-deep">예약 불가 시간</h2>
         <p className="mt-1 text-xs text-sub">점심시간, 정비 시간 등 예약을 받지 않을 시간을 등록합니다.</p>
@@ -262,6 +329,25 @@ export default function RoomsPage() {
         </Card>
       </section>
 
+      {/* 3. 등록된 방 목록 */}
+      <section className="mt-8">
+        <h2 className="text-sm font-bold text-deep">
+          등록된 방 목록{rooms && <span className="tabular-nums"> {rooms.length}개</span>}
+        </h2>
+        <div className="mt-2 space-y-3">
+          {rooms && rooms.length === 0 && (
+            <Card><p className="text-sm text-sub">등록된 방이 없습니다. 위에서 방을 등록해 주세요.</p></Card>
+          )}
+          {rooms?.map(r => (
+            <RoomEditor
+              key={`${r.id}-${r.name}-${r.open_min}-${r.close_min}`}
+              room={r}
+              onSaved={refresh}
+              onDeleted={refresh}
+            />
+          ))}
+        </div>
+      </section>
     </div>
   );
 }
