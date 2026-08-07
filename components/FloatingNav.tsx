@@ -9,10 +9,15 @@ const ITEMS = [
   { href: '/', label: '홈' },
   { href: '/status', label: '예약' },
   { href: '/point', label: '포인트 적립' },
-  { href: '/customer', label: '고객 등록' },
+  { href: '/customer', label: '고객 관리' },
   { href: '/rooms', label: '방 관리' },
   { href: '/admins', label: '관리자 계정 관리' },
 ];
+
+/** 하위 경로(/customer/12)도 그 메뉴에 있는 것으로 본다 */
+function current(path: string, href: string): boolean {
+  return href === '/' ? path === '/' : path === href || path.startsWith(`${href}/`);
+}
 
 export default function FloatingNav() {
   const pathname = usePathname();
@@ -42,7 +47,7 @@ export default function FloatingNav() {
               href={m.href}
               onClick={() => setOpen(false)}
               className={`flex min-h-11 items-center rounded-full border px-4 text-sm font-bold shadow-sm transition-opacity active:opacity-80 ${
-                clean === m.href
+                current(clean, m.href)
                   ? 'border-fair bg-fair text-white'
                   : 'border-line bg-white text-ink'
               }`}

@@ -181,7 +181,7 @@ export default function PointPage() {
       )}
       {notFound && (
         <p className="mt-4 text-sm font-semibold text-flag">
-          등록되지 않은 번호입니다. 고객 등록에서 먼저 추가해 주세요.
+          등록되지 않은 번호입니다. 고객 관리에서 먼저 추가해 주세요.
         </p>
       )}
     </div>

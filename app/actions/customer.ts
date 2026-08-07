@@ -3,7 +3,7 @@
 import { pool } from '@/lib/server/db';
 import { isOwner } from '@/lib/server/auth';
 import { STAMP_GOAL } from '@/lib/constants';
-import type { CouponUse, CustomerOverview } from '@/lib/types';
+import type { CouponUse, CustomerOverview, PaymentState } from '@/lib/types';
 
 const OVERVIEW_SQL = `
   select c.id, c.name, c.phone, c.last4, c.used_coupons,
@@ -26,12 +26,49 @@ function toOverview(r: {
   };
 }
 
-export async function listCustomers(): Promise<CustomerOverview[]> {
+export interface CustomerSearch {
+  total: number;                  // 등록된 전체 고객 수
+  matched: number;                // 검색 조건에 맞는 고객 수
+  customers: CustomerOverview[];  // 그중 최근 등록 순 limit명
+}
+
+/**
+ * 이름 또는 전화번호로 고객 조회.
+ * 검색어가 비어 있으면 최근 등록 순으로 보여준다.
+ * 전화번호는 하이픈을 무시하고 부분 일치시킨다 ('1406' → 010-5397-1406).
+ */
+export async function searchCustomers(q = '', limit = 30): Promise<CustomerSearch> {
   if (!(await isOwner())) throw new Error('UNAUTHORIZED');
-  const { rows } = await pool().query(
-    `${OVERVIEW_SQL} where c.deleted_at is null group by c.id order by c.created_at desc`,
-  );
-  return rows.map(toOverview);
+  const term = q.trim();
+  const digits = term.replace(/\D/g, '');
+  const take = Math.min(Math.max(1, Math.floor(limit)), 100);
+
+  let where = 'c.deleted_at is null';
+  const params: string[] = [];
+  if (term) {
+    params.push(`%${term}%`);
+    const or = [`c.name ilike $${params.length}`];
+    if (digits) {
+      params.push(`%${digits}%`);
+      or.push(`replace(c.phone, '-', '') like $${params.length}`);
+    }
+    where += ` and (${or.join(' or ')})`;
+  }
+
+  const [totalRes, matchedRes, listRes] = await Promise.all([
+    pool().query('select count(*)::int as n from customers where deleted_at is null'),
+    pool().query(`select count(*)::int as n from customers c where ${where}`, params),
+    pool().query(
+      `${OVERVIEW_SQL} where ${where} group by c.id order by c.created_at desc limit ${take}`,
+      params,
+    ),
+  ]);
+
+  return {
+    total: totalRes.rows[0].n,
+    matched: matchedRes.rows[0].n,
+    customers: listRes.rows.map(toOverview),
+  };
 }
 
 /** 뒤 4자리로 고객 조회 — 같은 뒤 4자리가 여러 명일 수 있어 배열로 반환 */
@@ -109,6 +146,43 @@ export async function getCustomerDetailById(id: number): Promise<CustomerDetail 
     stampDates: dates.rows.map(r => r.date),
     couponUses: uses.rows,
   };
+}
+
+export interface CustomerReservationRow {
+  id: number;
+  date: string;          // yyyymmdd
+  start_min: number;
+  end_min: number;
+  people: number;
+  payment: PaymentState;
+  room_name: string | null;
+}
+
+export interface CustomerProfile extends CustomerDetail {
+  joinedAt: string;                        // 등록일 yyyymmdd
+  reservations: CustomerReservationRow[];  // 최근 예약부터
+}
+
+/** 고객 상세 조회 — 포인트 현황 + 예약 내역까지 한 번에 */
+export async function getCustomerProfile(id: number): Promise<CustomerProfile | null> {
+  const detail = await getCustomerDetailById(id);
+  if (!detail) return null;
+  const [meta, res] = await Promise.all([
+    pool().query(
+      `select to_char(created_at at time zone 'Asia/Seoul', 'YYYYMMDD') as joined
+       from customers where id = $1`,
+      [id],
+    ),
+    pool().query(
+      `select r.id, r.date, r.start_min, r.end_min, r.people, r.payment, rm.name as room_name
+       from reservations r
+       left join rooms rm on rm.id = r.room_id
+       where r.customer_id = $1 and r.deleted_at is null
+       order by r.date desc, r.start_min desc`,
+      [id],
+    ),
+  ]);
+  return { ...detail, joinedAt: meta.rows[0]?.joined ?? '', reservations: res.rows };
 }
 
 export interface StampResult {

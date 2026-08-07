@@ -76,7 +76,7 @@ export async function createReservation(
     );
     if (!cust.rows.length) {
       await client.query('rollback');
-      return { ok: false, error: '고객을 찾을 수 없습니다. 고객 등록에서 먼저 추가해 주세요.' };
+      return { ok: false, error: '고객을 찾을 수 없습니다. 고객 관리에서 먼저 추가해 주세요.' };
     }
 
     const err = await insertReservation(client, cust.rows[0].id, input);
