@@ -241,8 +241,9 @@ function BookInner() {
 
       {/* 5. 확정 시트 — 시간을 선택하면 하단에 고정으로 떠서 스크롤 없이 예약 */}
       {selection && selectedRoom && <div className="h-80" />}
+      {/* 시트는 플로팅 메뉴(z-40)보다 위 — 떠 있는 동안 하단은 시트가 차지한다 */}
       {selection && selectedRoom && (
-        <div className="fixed inset-x-0 bottom-0 z-40 rounded-t-xl border-t border-line bg-turf">
+        <div className="fixed inset-x-0 bottom-0 z-[45] rounded-t-xl border-t border-line bg-turf">
           <div className="mx-auto max-h-[70dvh] max-w-xl space-y-4 overflow-y-auto px-4 pb-[calc(env(safe-area-inset-bottom,0px)+16px)] pt-4">
           <p className="text-base font-black text-deep tabular-nums">
             {fmtDate(date)} · {selectedRoom.name} · {toHM(selection.start)}–{toHM(selection.start + need)}

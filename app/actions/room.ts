@@ -112,53 +112,6 @@ export async function applyHoursToAllRooms(
   return { ok: true, changed: res.rowCount ?? 0 };
 }
 
-/**
- * 한 방의 '매일 반복' 예약 불가 시간을 모든 방에 동일하게 맞춘다.
- * 다른 방의 기존 매일 반복 항목은 삭제하고 원본 방의 항목으로 교체한다.
- * ('모든 방' 대상 항목과 특정 날짜 항목은 건드리지 않는다)
- */
-export async function applyBlocksToAllRooms(
-  sourceRoomId: number,
-): Promise<{ ok: true; changed: number } | { ok: false; error: string }> {
-  if (!(await isOwner())) return { ok: false, error: '권한이 없습니다.' };
-  const client = await pool().connect();
-  try {
-    await client.query('begin');
-    const src = await client.query(
-      `select label, start_min, end_min from blocks
-       where deleted_at is null and room_id = $1 and date is null
-       order by start_min`,
-      [sourceRoomId],
-    );
-    const targets = await client.query(
-      'select id from rooms where deleted_at is null and id <> $1 order by id',
-      [sourceRoomId],
-    );
-    let changed = 0;
-    for (const t of targets.rows) {
-      const del = await client.query(
-        `update blocks set deleted_at = now()
-         where deleted_at is null and room_id = $1 and date is null`,
-        [t.id],
-      );
-      for (const b of src.rows) {
-        await client.query(
-          'insert into blocks (room_id, label, date, start_min, end_min) values ($1,$2,null,$3,$4)',
-          [t.id, b.label, b.start_min, b.end_min],
-        );
-      }
-      if ((del.rowCount ?? 0) > 0 || src.rows.length > 0) changed += 1;
-    }
-    await client.query('commit');
-    return { ok: true, changed };
-  } catch (e) {
-    await client.query('rollback').catch(() => {});
-    throw e;
-  } finally {
-    client.release();
-  }
-}
-
 /** 방 일시 운영 중지 / 재개 — 중지하면 예약 화면에 노출되지 않는다 */
 export async function setRoomActive(id: number, active: boolean): Promise<Result> {
   if (!(await isOwner())) return { ok: false, error: '권한이 없습니다.' };

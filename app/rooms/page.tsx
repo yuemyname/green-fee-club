@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import {
-  applyBlocksToAllRooms, applyHoursToAllRooms, createBlock, createRoom, deleteBlock,
+  applyHoursToAllRooms, createBlock, createRoom, deleteBlock,
   deleteRoom, listBlocks, listRooms, setRoomActive, updateRoom,
   type BlockRow, type NewRoomBlock,
 } from '@/app/actions/room';
@@ -55,12 +55,11 @@ function Labeled({ label, hint, children }: { label: string; hint?: string; chil
 
 /** 예약 불가 시간 블록 — 신규 방 카드와 기존 방 카드가 같은 모양을 쓴다 */
 function BlockEditor({
-  items, onRemove, onAdd, onApplyAll, idPrefix,
+  items, onRemove, onAdd, idPrefix,
 }: {
   items: { key: string; label: string; start_min: number; end_min: number }[];
   onRemove: (key: string) => void;
   onAdd: (b: NewRoomBlock) => void;
-  onApplyAll?: () => void;   // 있으면 '모든 방에 적용' 버튼 노출
   idPrefix: string;
 }) {
   const toast = useToast();
@@ -115,69 +114,7 @@ function BlockEditor({
         <TimeSel label={`${idPrefix} 불가 종료`} value={end} onChange={setEnd} compact />
         <Btn tone="ghost" onClick={add} className="ml-auto shrink-0 px-2.5 sm:ml-0">추가</Btn>
       </div>
-      {onApplyAll && (
-        <div className="mt-2 flex justify-end">
-          <Btn tone="ghost" onClick={onApplyAll}>불가시간 일괄 적용</Btn>
-        </div>
-      )}
     </Labeled>
-  );
-}
-
-/** 예약 불가 시간 일괄 적용 미리보기 팝업 */
-function BulkBlocksDialog({
-  sourceName, sourceBlocks, targets, onApply, onClose,
-}: {
-  sourceName: string;
-  sourceBlocks: { label: string; start_min: number; end_min: number }[];
-  targets: { room: Room; blocks: BlockRow[] }[];
-  onApply: () => void;
-  onClose: () => void;
-}) {
-  const sig = (bs: { label: string; start_min: number; end_min: number }[]) =>
-    bs.map(b => `${b.label}|${b.start_min}|${b.end_min}`).sort().join(',');
-  const srcSig = sig(sourceBlocks);
-  const changing = targets.filter(t => sig(t.blocks) !== srcSig);
-  const srcText = sourceBlocks.length
-    ? sourceBlocks.map(b => `${b.label} ${toHM(b.start_min)}–${toHM(b.end_min)}`).join(', ')
-    : '없음';
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-deep/40 px-4"
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-sm rounded-xl border border-line bg-white p-4"
-        onClick={e => e.stopPropagation()}
-      >
-        <p className="text-sm font-bold text-deep">
-          {sourceName}의 예약 불가 시간을 모든 방에 적용할까요?
-        </p>
-        <p className="mt-1 text-xs text-sub tabular-nums">적용할 내용: {srcText}</p>
-        <div className="mt-3 space-y-1.5">
-          {changing.length === 0 && (
-            <p className="text-sm text-sub">이미 모든 방이 같은 예약 불가 시간입니다.</p>
-          )}
-          {changing.map(t => (
-            <p key={t.room.id} className="text-xs text-sub tabular-nums">
-              <b className="text-ink">{t.room.name}</b>{' '}
-              {t.blocks.length
-                ? t.blocks.map(b => `${b.label} ${toHM(b.start_min)}–${toHM(b.end_min)}`).join(', ')
-                : '없음'}{' '}
-              → <b className="text-fair">{srcText}</b>
-            </p>
-          ))}
-        </div>
-        <p className="mt-3 text-[11px] leading-relaxed text-sub">
-          각 방에 매일 적용되는 항목만 바뀝니다. &lsquo;모든 방&rsquo; 대상이나 특정 날짜 항목은 그대로 유지됩니다.
-        </p>
-        <div className="mt-4 flex gap-2">
-          <Btn tone="ghost" onClick={onClose} className="flex-1">취소</Btn>
-          <Btn onClick={onApply} disabled={changing.length === 0} className="flex-1">적용</Btn>
-        </div>
-      </div>
-    </div>
   );
 }
 
@@ -225,12 +162,11 @@ function BulkHoursDialog({
 }
 
 function RoomEditor({
-  room, rooms, blocks, allBlocks, onChanged,
+  room, rooms, blocks, onChanged,
 }: {
   room: Room;
   rooms: Room[];
   blocks: BlockRow[];      // 이 방 전용(매일) 예약 불가 시간
-  allBlocks: BlockRow[];   // 전체 — 일괄 적용 미리보기용
   onChanged: () => void;
 }) {
   const toast = useToast();
@@ -239,7 +175,6 @@ function RoomEditor({
   const [close, setClose] = useState(room.close_min);
   const [busy, setBusy] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
-  const [bulkBlocksOpen, setBulkBlocksOpen] = useState(false);
 
   const save = async () => {
     if (busy) return;
@@ -321,18 +256,6 @@ function RoomEditor({
     }
   };
 
-  const applyBlocksAll = async () => {
-    setBulkBlocksOpen(false);
-    setBusy(true);
-    try {
-      const res = await applyBlocksToAllRooms(room.id);
-      toast(res.ok ? `${res.changed}개 방의 예약 불가 시간을 맞췄습니다.` : res.error);
-      if (res.ok) onChanged();
-    } finally {
-      setBusy(false);
-    }
-  };
-
   return (
     <Card className={`space-y-4 ${room.active ? '' : 'bg-line/30'}`}>
       <Labeled label="방 이름">
@@ -352,7 +275,8 @@ function RoomEditor({
       </Labeled>
 
       <Labeled label="운영 시간">
-        <div className="flex items-center gap-2">
+        {/* 좁은 화면에서는 일괄 적용 버튼이 아랫줄로 내려간다 */}
+        <div className="flex flex-wrap items-center gap-2">
           <TimeSel label={`${room.name} 운영 시작`} value={open} onChange={setOpen} />
           <span className="text-sub">–</span>
           <TimeSel label={`${room.name} 운영 종료`} value={close} onChange={setClose} />
@@ -362,15 +286,17 @@ function RoomEditor({
         </div>
       </Labeled>
 
-      <BlockEditor
-        idPrefix={room.name}
-        items={blocks.map(b => ({
-          key: String(b.id), label: b.label, start_min: b.start_min, end_min: b.end_min,
-        }))}
-        onRemove={removeBlock}
-        onAdd={addBlock}
-        onApplyAll={rooms.length > 1 ? () => setBulkBlocksOpen(true) : undefined}
-      />
+      {/* 이 방에 걸린 예약 불가 시간이 있을 때만 노출 — 없으면 아래 '예약 불가 시간 추가'에서 넣는다 */}
+      {blocks.length > 0 && (
+        <BlockEditor
+          idPrefix={room.name}
+          items={blocks.map(b => ({
+            key: String(b.id), label: b.label, start_min: b.start_min, end_min: b.end_min,
+          }))}
+          onRemove={removeBlock}
+          onAdd={addBlock}
+        />
+      )}
 
       <div className="flex gap-2">
         <Btn tone="ghost" onClick={toggleActive} disabled={busy} className="flex-1">
@@ -387,20 +313,6 @@ function RoomEditor({
           close_min={close}
           onApply={applyAll}
           onClose={() => setBulkOpen(false)}
-        />
-      )}
-      {bulkBlocksOpen && (
-        <BulkBlocksDialog
-          sourceName={room.name}
-          sourceBlocks={blocks}
-          targets={rooms
-            .filter(r => r.id !== room.id)
-            .map(r => ({
-              room: r,
-              blocks: allBlocks.filter(b => b.room_id === r.id && b.date === null),
-            }))}
-          onApply={applyBlocksAll}
-          onClose={() => setBulkBlocksOpen(false)}
         />
       )}
     </Card>
@@ -547,7 +459,7 @@ export default function RoomsPage() {
       <section className="mt-8">
         <h2 className="text-sm font-bold text-deep">예약 불가 시간</h2>
         <p className="mt-1 text-xs text-sub">
-          모든 방에 걸거나 특정 날짜만 막을 때 사용합니다. 방 하나에만 매일 적용할 시간은 아래 방 카드에서 바로 넣을 수 있습니다.
+          모든 방에 걸거나, 방 하나만 골라서, 또는 특정 날짜만 막을 때 사용합니다. 등록된 시간은 아래 방 카드에서도 확인하고 지울 수 있습니다.
         </p>
 
         <div className="mt-3 space-y-2">
@@ -570,24 +482,28 @@ export default function RoomsPage() {
 
         <Card className="mt-3 space-y-3 bg-turf">
           <p className="text-sm font-bold text-deep">예약 불가 시간 추가</p>
-          <input
-            aria-label="예약 불가 라벨"
-            value={blLabel}
-            onChange={e => setBlLabel(e.target.value)}
-            placeholder="불가 사유"
-            className="h-11 w-full rounded-lg border border-line bg-white px-3 text-base outline-none placeholder:text-sub focus:border-fair"
-          />
-          <select
-            aria-label="대상 방"
-            value={blRoom === 'all' ? 'all' : String(blRoom)}
-            onChange={e => setBlRoom(e.target.value === 'all' ? 'all' : Number(e.target.value))}
-            className="h-11 w-full rounded-lg border border-line bg-white px-2 text-sm font-semibold outline-none focus:border-fair"
-          >
-            <option value="all">모든 방</option>
-            {rooms?.map(r => (
-              <option key={r.id} value={r.id}>{r.name}</option>
-            ))}
-          </select>
+          {/* 불가 사유와 대상 방을 한 줄에 반반으로 */}
+          <div className="flex items-center gap-2">
+            <input
+              aria-label="예약 불가 라벨"
+              value={blLabel}
+              onChange={e => setBlLabel(e.target.value)}
+              maxLength={10}
+              placeholder="불가 사유"
+              className="h-11 w-1/2 min-w-0 rounded-lg border border-line bg-white px-3 text-base outline-none placeholder:text-sub focus:border-fair"
+            />
+            <select
+              aria-label="대상 방"
+              value={blRoom === 'all' ? 'all' : String(blRoom)}
+              onChange={e => setBlRoom(e.target.value === 'all' ? 'all' : Number(e.target.value))}
+              className="h-11 w-1/2 min-w-0 rounded-lg border border-line bg-white px-2 text-sm font-semibold outline-none focus:border-fair"
+            >
+              <option value="all">모든 방</option>
+              {rooms?.map(r => (
+                <option key={r.id} value={r.id}>{r.name}</option>
+              ))}
+            </select>
+          </div>
           <label className="flex min-h-11 items-center gap-2 text-sm font-semibold">
             <input
               type="checkbox"
@@ -623,7 +539,6 @@ export default function RoomsPage() {
               room={r}
               rooms={rooms}
               blocks={(blocks ?? []).filter(b => b.room_id === r.id && b.date === null)}
-              allBlocks={blocks ?? []}
               onChanged={refresh}
             />
           ))}

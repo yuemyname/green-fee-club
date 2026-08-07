@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
+import FloatingNav from '@/components/FloatingNav';
 import Header from '@/components/Header';
 import { ToastProvider } from '@/components/ui/Toast';
 
@@ -26,6 +27,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ToastProvider>
           <Header />
           <main className="mx-auto max-w-xl px-4 py-6 pb-24">{children}</main>
+          <FloatingNav />
         </ToastProvider>
       </body>
     </html>
