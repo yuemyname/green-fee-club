@@ -69,7 +69,10 @@ export async function adminId(): Promise<number | null> {
 export async function isOwner(): Promise<boolean> {
   const id = await adminId();
   if (id === null) return false;
-  const { rows } = await pool().query('select 1 from admins where id = $1', [id]);
+  const { rows } = await pool().query(
+    'select 1 from admins where id = $1 and deleted_at is null',
+    [id],
+  );
   return rows.length > 0;
 }
 

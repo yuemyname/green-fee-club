@@ -21,17 +21,20 @@ export async function validateSlot(
 ): Promise<string | null> {
   const end = input.start_min + needMin(input.people);
 
-  const room = await client.query('select open_min, close_min from rooms where id = $1', [
-    input.room_id,
-  ]);
+  const room = await client.query(
+    'select open_min, close_min, active from rooms where id = $1 and deleted_at is null',
+    [input.room_id],
+  );
   if (!room.rows.length) return '방을 찾을 수 없습니다.';
+  if (!room.rows[0].active) return '운영이 중지된 방입니다.';
   if (input.start_min < room.rows[0].open_min || end > room.rows[0].close_min) {
     return '운영시간을 벗어난 시간입니다. 시간을 다시 골라주세요.';
   }
 
   const blocked = await client.query(
     `select 1 from blocks
-     where (room_id is null or room_id = $1)
+     where deleted_at is null
+       and (room_id is null or room_id = $1)
        and (date is null or date = $2)
        and start_min < $3 and $4 < end_min
      limit 1`,
@@ -41,7 +44,8 @@ export async function validateSlot(
 
   const overlap = await client.query(
     `select 1 from reservations
-     where room_id = $1 and date = $2 and start_min < $3 and $4 < end_min
+     where deleted_at is null
+       and room_id = $1 and date = $2 and start_min < $3 and $4 < end_min
        and ($5::bigint is null or id <> $5)
      limit 1`,
     [input.room_id, input.date, end, input.start_min, excludeReservationId ?? null],
@@ -66,12 +70,12 @@ export async function insertReservation(
 
   if (input.use_free) {
     const c = await client.query(
-      'select used_coupons from customers where id = $1 for update',
+      'select used_coupons from customers where id = $1 and deleted_at is null for update',
       [customerId],
     );
     if (!c.rows.length) return '고객 정보를 찾을 수 없습니다.';
     const stamps = await client.query(
-      'select count(*)::int as total from stamps where customer_id = $1',
+      'select count(*)::int as total from stamps where customer_id = $1 and deleted_at is null',
       [customerId],
     );
     if (Math.floor(stamps.rows[0].total / STAMP_GOAL) - c.rows[0].used_coupons < 1) {

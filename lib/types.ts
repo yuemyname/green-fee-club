@@ -3,6 +3,7 @@ export interface Room {
   name: string;
   open_min: number;   // 방별 운영 시작
   close_min: number;  // 방별 운영 종료
+  active: boolean;    // false면 일시 운영 중지 (예약 화면에서 숨김)
 }
 
 /** 예약 불가 시간 (점심시간 등) */

@@ -16,21 +16,21 @@ export interface Board {
 export async function listBoard(date: string): Promise<Board> {
   if (!(await isOwner())) throw new Error('UNAUTHORIZED');
   const [rooms, reservations, blocks] = await Promise.all([
-    pool().query('select id, name, open_min, close_min from rooms order by id'),
+    pool().query('select id, name, open_min, close_min, active from rooms where deleted_at is null order by id'),
     pool().query(
       `select r.id, r.date, r.room_id, r.start_min, r.end_min, r.customer_id,
               r.people, r.is_free, r.payment, c.name as customer_name,
-              ((select count(*) from stamps s where s.customer_id = c.id)::int / ${STAMP_GOAL}
+              ((select count(*) from stamps s where s.customer_id = c.id and s.deleted_at is null)::int / ${STAMP_GOAL}
                 - c.used_coupons) as customer_coupons
        from reservations r
        join customers c on c.id = r.customer_id
-       where r.date = $1
+       where r.deleted_at is null and r.date = $1
        order by r.room_id, r.start_min`,
       [date],
     ),
     pool().query(
       `select id, room_id, label, date, start_min, end_min
-       from blocks where date is null or date = $1 order by start_min`,
+       from blocks where deleted_at is null and (date is null or date = $1) order by start_min`,
       [date],
     ),
   ]);
@@ -42,7 +42,8 @@ export async function monthReservedDates(month: string): Promise<string[]> {
   if (!(await isOwner())) throw new Error('UNAUTHORIZED');
   if (!/^\d{6}$/.test(month)) return [];
   const { rows } = await pool().query(
-    `select distinct date from reservations where date >= $1 || '01' and date <= $1 || '31'`,
+    `select distinct date from reservations
+     where deleted_at is null and date >= $1 || '01' and date <= $1 || '31'`,
     [month],
   );
   return rows.map(r => r.date);
@@ -70,7 +71,7 @@ export async function createReservation(
     ]);
 
     const cust = await client.query(
-      'select id, name from customers where id = $1',
+      'select id, name from customers where id = $1 and deleted_at is null',
       [input.customer_id],
     );
     if (!cust.rows.length) {
@@ -113,7 +114,7 @@ export async function confirmPayment(
       `select r.id, r.date, r.payment, r.customer_id, c.name, c.used_coupons
        from reservations r
        join customers c on c.id = r.customer_id
-       where r.id = $1
+       where r.id = $1 and r.deleted_at is null
        for update of r, c`,
       [reservationId],
     );
@@ -138,7 +139,7 @@ export async function confirmPayment(
         r.customer_id, r.date,
       ]);
       const stamps = await client.query(
-        'select count(*)::int as total from stamps where customer_id = $1',
+        'select count(*)::int as total from stamps where customer_id = $1 and deleted_at is null',
         [r.customer_id],
       );
       const total = stamps.rows[0].total;
@@ -146,7 +147,7 @@ export async function confirmPayment(
       progress = cardCompleted ? STAMP_GOAL : total % STAMP_GOAL;
     } else {
       const stamps = await client.query(
-        'select count(*)::int as total from stamps where customer_id = $1',
+        'select count(*)::int as total from stamps where customer_id = $1 and deleted_at is null',
         [r.customer_id],
       );
       if (Math.floor(stamps.rows[0].total / STAMP_GOAL) - r.used_coupons < 1) {

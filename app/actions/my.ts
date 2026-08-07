@@ -26,7 +26,7 @@ export async function startCustomerSession(
 
   // 전체 번호가 고유 식별자 — 뒤 4자리가 같아도 번호가 다르면 별도 고객
   const found = await pool().query(
-    `select id, name from customers where replace(phone, '-', '') = $1 limit 1`,
+    `select id, name from customers where deleted_at is null and replace(phone, '-', '') = $1 limit 1`,
     [phoneDigits],
   );
   if (found.rows.length) {
@@ -73,19 +73,19 @@ export async function getMyPage(): Promise<MyPage | null> {
     pool().query(
       `select c.id, c.name, c.phone, c.last4, c.used_coupons,
               count(s.id)::int as total
-       from customers c left join stamps s on s.customer_id = c.id
-       where c.id = $1 group by c.id`,
+       from customers c left join stamps s on s.customer_id = c.id and s.deleted_at is null
+       where c.id = $1 and c.deleted_at is null group by c.id`,
       [cid],
     ),
     pool().query(
-      'select date from stamps where customer_id = $1 order by created_at, id',
+      'select date from stamps where customer_id = $1 and deleted_at is null order by created_at, id',
       [cid],
     ),
     pool().query(
       `select r.date, r.start_min, r.end_min, rm.name as room_name
        from reservations r
        left join rooms rm on rm.id = r.room_id
-       where r.customer_id = $1 and r.payment = 'point'
+       where r.customer_id = $1 and r.deleted_at is null and r.payment = 'point'
        order by r.paid_at nulls first, r.id`,
       [cid],
     ),
@@ -94,7 +94,7 @@ export async function getMyPage(): Promise<MyPage | null> {
               r.start_min, r.end_min, r.people, r.payment
        from reservations r
        left join rooms rm on rm.id = r.room_id
-       where r.customer_id = $1
+       where r.customer_id = $1 and r.deleted_at is null
        order by r.date desc, r.start_min desc
        limit 30`,
       [cid],
@@ -125,7 +125,8 @@ export async function myMonthReservedDates(month: string): Promise<string[]> {
   if (cid === null || !/^\d{6}$/.test(month)) return [];
   const { rows } = await pool().query(
     `select distinct date from reservations
-     where customer_id = $1 and date >= $2 || '01' and date <= $2 || '31'`,
+     where deleted_at is null and customer_id = $1
+       and date >= $2 || '01' and date <= $2 || '31'`,
     [cid, month],
   );
   return rows.map(r => r.date);
@@ -144,21 +145,24 @@ export async function myBoard(date: string): Promise<MyBoard | null> {
   if (cid === null) return null;
 
   const [rooms, blocks, resv, cust] = await Promise.all([
-    pool().query('select id, name, open_min, close_min from rooms order by id'),
+    pool().query(
+      `select id, name, open_min, close_min, active from rooms
+       where deleted_at is null and active order by id`,
+    ),
     pool().query(
       `select id, room_id, label, date, start_min, end_min
-       from blocks where date is null or date = $1 order by start_min`,
+       from blocks where deleted_at is null and (date is null or date = $1) order by start_min`,
       [date],
     ),
     pool().query(
       `select id, date, room_id, start_min, end_min, customer_id
-       from reservations where date = $1 order by room_id, start_min`,
+       from reservations where deleted_at is null and date = $1 order by room_id, start_min`,
       [date],
     ),
     pool().query(
-      `select ((select count(*) from stamps s where s.customer_id = c.id)::int / ${STAMP_GOAL}
+      `select ((select count(*) from stamps s where s.customer_id = c.id and s.deleted_at is null)::int / ${STAMP_GOAL}
                - c.used_coupons) as coupons
-       from customers c where c.id = $1`,
+       from customers c where c.id = $1 and c.deleted_at is null`,
       [cid],
     ),
   ]);
@@ -225,7 +229,7 @@ export async function myUpdateReservation(
       `${input.date}:${input.room_id}`,
     ]);
     const found = await client.query(
-      'select customer_id, payment from reservations where id = $1 for update',
+      'select customer_id, payment from reservations where id = $1 and deleted_at is null for update',
       [reservationId],
     );
     if (!found.rows.length || found.rows[0].customer_id !== cid) {
@@ -268,7 +272,7 @@ export async function myCancelReservation(
   try {
     await client.query('begin');
     const found = await client.query(
-      'select customer_id, payment from reservations where id = $1 for update',
+      'select customer_id, payment from reservations where id = $1 and deleted_at is null for update',
       [reservationId],
     );
     if (!found.rows.length || found.rows[0].customer_id !== cid) {
@@ -286,7 +290,7 @@ export async function myCancelReservation(
         [cid],
       );
     }
-    await client.query('delete from reservations where id = $1', [reservationId]);
+    await client.query('update reservations set deleted_at = now() where id = $1', [reservationId]);
     await client.query('commit');
     return { ok: true, refunded };
   } catch (e) {

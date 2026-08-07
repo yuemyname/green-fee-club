@@ -54,7 +54,7 @@ function BookInner() {
       { slots: number[]; busy: { start: number; end: number; label?: string }[] }
     >();
     if (!board) return map;
-    for (const room of board.rooms) {
+    for (const room of board.rooms.filter(r => r.active)) {
       const timeline = buildTimeline(board.reservations, room.id, date, {
         open: room.open_min,
         close: room.close_min,
@@ -77,7 +77,7 @@ function BookInner() {
   // 최초·조건 변경 시 예약 가능한 시간이 있는 첫 방만 자동으로 펼친다
   useEffect(() => {
     if (!board) return;
-    const first = board.rooms.find(r => (roomData.get(r.id)?.slots.length ?? 0) > 0);
+    const first = board.rooms.filter(r => r.active).find(r => (roomData.get(r.id)?.slots.length ?? 0) > 0);
     setExpandedRoom(first?.id ?? null);
   }, [board, roomData]);
 
@@ -202,7 +202,12 @@ function BookInner() {
       {/* 4. 방별 시작 가능 시간 */}
       {board && (
         <div className="mt-4 space-y-4">
-          {board.rooms.map(room => (
+          {board.rooms.filter(r => r.active).length === 0 && (
+            <p className="text-sm text-sub">
+              예약할 수 있는 방이 없습니다. 방 관리에서 방을 등록하거나 운영을 재개해 주세요.
+            </p>
+          )}
+          {board.rooms.filter(r => r.active).map(room => (
             <SlotPicker
               key={room.id}
               roomName={room.name}

@@ -9,7 +9,7 @@ const OVERVIEW_SQL = `
   select c.id, c.name, c.phone, c.last4, c.used_coupons,
          count(s.id)::int as total
   from customers c
-  left join stamps s on s.customer_id = c.id
+  left join stamps s on s.customer_id = c.id and s.deleted_at is null
 `;
 
 function toOverview(r: {
@@ -29,7 +29,7 @@ function toOverview(r: {
 export async function listCustomers(): Promise<CustomerOverview[]> {
   if (!(await isOwner())) throw new Error('UNAUTHORIZED');
   const { rows } = await pool().query(
-    `${OVERVIEW_SQL} group by c.id order by c.created_at desc`,
+    `${OVERVIEW_SQL} where c.deleted_at is null group by c.id order by c.created_at desc`,
   );
   return rows.map(toOverview);
 }
@@ -38,7 +38,7 @@ export async function listCustomers(): Promise<CustomerOverview[]> {
 export async function findCustomersByLast4(last4: string): Promise<CustomerOverview[]> {
   if (!(await isOwner())) throw new Error('UNAUTHORIZED');
   const { rows } = await pool().query(
-    `${OVERVIEW_SQL} where c.last4 = $1 group by c.id order by c.created_at`,
+    `${OVERVIEW_SQL} where c.deleted_at is null and c.last4 = $1 group by c.id order by c.created_at`,
     [last4],
   );
   return rows.map(toOverview);
@@ -58,7 +58,7 @@ export async function createCustomer(
   const phone = `${phoneDigits.slice(0, 3)}-${phoneDigits.slice(3, 7)}-${phoneDigits.slice(7, 11)}`;
   // 뒤 4자리 중복은 허용하되, 완전히 같은 번호는 중복 등록 불가
   const dup = await pool().query(
-    `select 1 from customers where replace(phone, '-', '') = $1 limit 1`,
+    `select 1 from customers where deleted_at is null and replace(phone, '-', '') = $1 limit 1`,
     [phoneDigits],
   );
   if (dup.rows.length) return { ok: false, error: '이미 등록된 번호입니다.' };
@@ -85,21 +85,21 @@ export interface CustomerDetail {
 export async function getCustomerDetailById(id: number): Promise<CustomerDetail | null> {
   if (!(await isOwner())) throw new Error('UNAUTHORIZED');
   const { rows } = await pool().query(
-    `${OVERVIEW_SQL} where c.id = $1 group by c.id`,
+    `${OVERVIEW_SQL} where c.deleted_at is null and c.id = $1 group by c.id`,
     [id],
   );
   if (!rows.length) return null;
   const customer = toOverview(rows[0]);
   const [dates, uses] = await Promise.all([
     pool().query(
-      'select date from stamps where customer_id = $1 order by created_at, id',
+      'select date from stamps where customer_id = $1 and deleted_at is null order by created_at, id',
       [customer.id],
     ),
     pool().query(
       `select r.date, r.start_min, r.end_min, rm.name as room_name
        from reservations r
        left join rooms rm on rm.id = r.room_id
-       where r.customer_id = $1 and r.payment = 'point'
+       where r.customer_id = $1 and r.deleted_at is null and r.payment = 'point'
        order by r.paid_at nulls first, r.id`,
       [customer.id],
     ),
@@ -128,7 +128,7 @@ export async function addStamp(
   try {
     await client.query('begin');
     const found = await client.query(
-      'select id from customers where id = $1 for update',
+      'select id from customers where id = $1 and deleted_at is null for update',
       [customerId],
     );
     if (!found.rows.length) {
@@ -138,18 +138,18 @@ export async function addStamp(
     const id = found.rows[0].id;
     await client.query('insert into stamps (customer_id, date) values ($1,$2)', [id, date]);
     const { rows } = await client.query(
-      `${OVERVIEW_SQL} where c.id = $1 group by c.id`,
+      `${OVERVIEW_SQL} where c.deleted_at is null and c.id = $1 group by c.id`,
       [id],
     );
     const dates = await client.query(
-      'select date from stamps where customer_id = $1 order by created_at, id',
+      'select date from stamps where customer_id = $1 and deleted_at is null order by created_at, id',
       [id],
     );
     const uses = await client.query(
       `select r.date, r.start_min, r.end_min, rm.name as room_name
        from reservations r
        left join rooms rm on rm.id = r.room_id
-       where r.customer_id = $1 and r.payment = 'point'
+       where r.customer_id = $1 and r.deleted_at is null and r.payment = 'point'
        order by r.paid_at nulls first, r.id`,
       [id],
     );

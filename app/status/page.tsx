@@ -75,6 +75,7 @@ export default function StatusPage() {
               roomId={room.id}
               roomName={room.name}
               date={date}
+              active={room.active}
               onChanged={refresh}
             />
           ))}

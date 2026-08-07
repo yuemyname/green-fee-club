@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import {
   createBlock, createRoom, deleteBlock, deleteRoom, listBlocks, listRooms,
-  updateRoom, type BlockRow, type NewRoomBlock,
+  setRoomActive, updateRoom, type BlockRow, type NewRoomBlock,
 } from '@/app/actions/room';
 import { fmtDate, toHM, todayStr } from '@/lib/time';
 import type { Room } from '@/lib/types';
@@ -50,6 +50,23 @@ function RoomEditor({
   const [close, setClose] = useState(room.close_min);
   const [busy, setBusy] = useState(false);
 
+  const toggleActive = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const res = await setRoomActive(room.id, !room.active);
+      toast(
+        !res.ok ? res.error
+          : room.active
+            ? `${room.name} 운영을 중지했습니다. 예약 화면에 보이지 않습니다.`
+            : `${room.name} 운영을 다시 시작했습니다.`,
+      );
+      if (res.ok) onSaved();
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const save = async () => {
     if (busy) return;
     setBusy(true);
@@ -66,7 +83,7 @@ function RoomEditor({
     if (busy || !window.confirm(`${room.name}을 삭제할까요?`)) return;
     setBusy(true);
     try {
-      const res = await deleteRoom(room.id);
+      const res = await deleteRoom(room.id, todayStr());
       toast(res.ok ? `${room.name}이(가) 삭제되었습니다.` : res.error);
       if (res.ok) onDeleted();
     } finally {
@@ -75,13 +92,20 @@ function RoomEditor({
   };
 
   return (
-    <Card className="space-y-3">
-      <input
-        aria-label="방 이름"
-        value={name}
-        onChange={e => setName(e.target.value)}
-        className="h-11 w-full rounded-lg border border-line bg-white px-3 text-base font-bold outline-none focus:border-fair"
-      />
+    <Card className={`space-y-3 ${room.active ? '' : 'bg-line/30'}`}>
+      <div className="flex items-center gap-2">
+        <input
+          aria-label="방 이름"
+          value={name}
+          onChange={e => setName(e.target.value)}
+          className="h-11 min-w-0 flex-1 rounded-lg border border-line bg-white px-3 text-base font-bold outline-none focus:border-fair"
+        />
+        {!room.active && (
+          <span className="rounded-md bg-sub px-1.5 py-0.5 text-[11px] font-bold text-white whitespace-nowrap">
+            운영 중지
+          </span>
+        )}
+      </div>
       <div className="flex items-center gap-2">
         <span className="text-sm text-sub">운영시간</span>
         <TimeSel label={`${room.name} 운영 시작`} value={open} onChange={setOpen} />
@@ -89,11 +113,26 @@ function RoomEditor({
         <TimeSel label={`${room.name} 운영 종료`} value={close} onChange={setClose} />
       </div>
       <div className="flex gap-2">
-        <Btn tone="ghost" onClick={remove} disabled={busy} className="flex-1">삭제</Btn>
+        <Btn tone="ghost" onClick={toggleActive} disabled={busy} className="flex-1">
+          {room.active ? '운영 중지' : '운영 재개'}
+        </Btn>
         <Btn onClick={save} disabled={busy} className="flex-1">변경</Btn>
       </div>
+      <Btn tone="ghost" onClick={remove} disabled={busy} className="w-full">삭제</Btn>
     </Card>
   );
+}
+
+/**
+ * 등록된 방 이름을 보고 다음 방 이름을 제안한다.
+ * 'N번방' 패턴으로 일관되면 다음 번호를, 아니면 안내 문구를 반환한다.
+ */
+function nextRoomHint(rooms: Room[] | null): string {
+  if (!rooms) return '방 이름을 등록하세요';
+  if (rooms.length === 0) return '1번방';
+  const nums = rooms.map(r => /^(\d+)번방$/.exec(r.name.trim())?.[1]);
+  if (nums.some(n => n === undefined)) return '방 이름을 등록하세요';
+  return `${Math.max(...nums.map(n => Number(n))) + 1}번방`;
 }
 
 export default function RoomsPage() {
@@ -118,6 +157,8 @@ export default function RoomsPage() {
   const [blDate, setBlDate] = useState(todayStr());
   const [blStart, setBlStart] = useState(720);
   const [blEnd, setBlEnd] = useState(780);
+
+  const nameHint = nextRoomHint(rooms);
 
   const refresh = () => {
     listRooms().then(setRooms).catch(() => setRooms([]));
@@ -203,7 +244,7 @@ export default function RoomsPage() {
               aria-label="새 방 이름"
               value={newName}
               onChange={e => setNewName(e.target.value)}
-              placeholder="3번방"
+              placeholder={nameHint}
               className="h-11 w-full rounded-lg border border-line bg-white px-3 text-base outline-none placeholder:text-sub focus:border-fair"
             />
           </div>

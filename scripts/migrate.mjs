@@ -40,6 +40,25 @@ try {
   // 기존 DB의 last4 unique 제약 제거 — 뒤 4자리가 같은 고객 등록 허용
   await client.query('alter table customers drop constraint if exists customers_last4_key');
 
+  // 공통 컬럼(생성/수정일시·삭제여부) 보강 + updated_at 자동 갱신 트리거
+  const TABLES = ['stores', 'admins', 'customers', 'stamps', 'rooms', 'reservations', 'blocks'];
+  for (const t of TABLES) {
+    await client.query(
+      `alter table ${t}
+         add column if not exists created_at timestamptz not null default now(),
+         add column if not exists updated_at timestamptz not null default now(),
+         add column if not exists deleted_at timestamptz`,
+    );
+    await client.query(`drop trigger if exists ${t}_set_updated_at on ${t}`);
+    await client.query(
+      `create trigger ${t}_set_updated_at before update on ${t}
+       for each row execute function set_updated_at()`,
+    );
+  }
+
+  // 방 운영 상태 (false면 일시 중지)
+  await client.query('alter table rooms add column if not exists active boolean not null default true');
+
   // 매장이 없으면 1건 생성
   let storeId;
   const store = await client.query('select id from stores order by id limit 1');

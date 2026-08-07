@@ -19,12 +19,14 @@ export default function RoomTimeline({
   roomId,
   roomName,
   date,
+  active = true,
   onChanged,
 }: {
   segments: Segment<ReservationRow>[];
   roomId: number;
   roomName: string;
   date: string;
+  active?: boolean;
   onChanged?: () => void;
 }) {
   const router = useRouter();
@@ -55,7 +57,14 @@ export default function RoomTimeline({
 
   return (
     <div className="rounded-xl border border-line bg-white p-4">
-      <p className="text-base font-black text-deep">{roomName}</p>
+      <p className="flex items-center gap-1.5 text-base font-black text-deep">
+        {roomName}
+        {!active && (
+          <span className="rounded-md bg-sub px-1.5 py-0.5 text-[11px] font-bold text-white whitespace-nowrap">
+            운영 중지
+          </span>
+        )}
+      </p>
       <div className="mt-3 space-y-2">
         {segments.map(seg => {
           const range = `${toHM(seg.start)} – ${toHM(seg.end)}`;
@@ -71,6 +80,18 @@ export default function RoomTimeline({
             );
           }
           if (seg.type === 'open') {
+            // 운영 중지된 방은 예약으로 이어지지 않는다
+            if (!active) {
+              return (
+                <div
+                  key={seg.start}
+                  className="flex min-h-11 items-center justify-between rounded-lg bg-line/40 px-3 py-2.5"
+                >
+                  <span className="text-sm font-semibold text-sub tabular-nums">{range}</span>
+                  <span className="text-xs font-semibold text-sub">운영 중지</span>
+                </div>
+              );
+            }
             return (
               <button
                 key={seg.start}
