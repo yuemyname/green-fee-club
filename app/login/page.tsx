@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { login } from '@/app/actions/auth';
 import Btn from '@/components/ui/Btn';
-import Eyebrow from '@/components/ui/Eyebrow';
 import { useToast } from '@/components/ui/Toast';
 
 export default function LoginPage() {
@@ -27,7 +26,13 @@ export default function LoginPage() {
 
   return (
     <div className="flex flex-col justify-center pt-16">
-      <Eyebrow>SCREEN GOLF (GOLD ZONE)</Eyebrow>
+      {/* 'Golf Zone'은 표기 그대로 — Eyebrow의 대문자 변환을 끈다 */}
+      <p
+        className="text-xs font-semibold tracking-widest text-mint"
+        style={{ textTransform: 'none' }}
+      >
+        SCREEN GOLF (Golf Zone)
+      </p>
       <h1 className="mt-2 text-4xl font-black leading-tight text-deep" style={{ letterSpacing: '-0.03em' }}>
         트윈빌스크린
         <br />
