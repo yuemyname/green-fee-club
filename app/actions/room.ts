@@ -95,6 +95,23 @@ export async function updateRoom(
   return { ok: true };
 }
 
+/** 운영시간을 모든 방에 일괄 적용 — 바뀐 방 수를 돌려준다 */
+export async function applyHoursToAllRooms(
+  open_min: number,
+  close_min: number,
+): Promise<{ ok: true; changed: number } | { ok: false; error: string }> {
+  if (!(await isOwner())) return { ok: false, error: '권한이 없습니다.' };
+  if (!(open_min >= 0 && close_min <= 1440 && open_min < close_min)) {
+    return { ok: false, error: '운영시간이 올바르지 않습니다. 시작이 종료보다 빨라야 합니다.' };
+  }
+  const res = await pool().query(
+    `update rooms set open_min = $1, close_min = $2
+     where deleted_at is null and (open_min <> $1 or close_min <> $2)`,
+    [open_min, close_min],
+  );
+  return { ok: true, changed: res.rowCount ?? 0 };
+}
+
 /** 방 일시 운영 중지 / 재개 — 중지하면 예약 화면에 노출되지 않는다 */
 export async function setRoomActive(id: number, active: boolean): Promise<Result> {
   if (!(await isOwner())) return { ok: false, error: '권한이 없습니다.' };
