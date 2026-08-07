@@ -237,6 +237,8 @@ function BookInner() {
               slots={roomData.get(room.id)?.slots ?? []}
               busy={roomData.get(room.id)?.busy ?? []}
               need={need}
+              open={room.open_min}
+              close={room.close_min}
               selected={selection?.roomId === room.id ? selection.start : null}
               onSelect={start => {
                 setSelection({ roomId: room.id, start });

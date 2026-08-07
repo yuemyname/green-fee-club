@@ -1,11 +1,22 @@
 'use client';
 
 import { useState } from 'react';
+import { SLOT_STEP } from '@/lib/constants';
 import { fmtDur, toHM } from '@/lib/time';
 import Btn from '@/components/ui/Btn';
+import { useToast } from '@/components/ui/Toast';
 import Wheel, { WHEEL_ROW, WHEEL_VISIBLE } from '@/components/ui/Wheel';
 
 const pad = (n: number) => String(n).padStart(2, '0');
+const MINUTES = Array.from({ length: 60 / SLOT_STEP }, (_, i) => i * SLOT_STEP);
+
+/** 고른 시각이 안 되면 그 이후 가장 가까운 시각, 없으면 그 이전 가장 가까운 시각 */
+function nearestSlot(slots: number[], wanted: number): number | null {
+  if (!slots.length) return null;
+  const next = slots.find(s => s >= wanted);
+  if (next !== undefined) return next;
+  return slots[slots.length - 1];
+}
 
 /**
  * 방 하나의 예약 카드 — 접힌 상태에서는 예약 가능 개수만,
@@ -17,6 +28,8 @@ export default function SlotPicker({
   slots,
   busy,
   need,
+  open,
+  close,
   selected,
   onSelect,
   expanded,
@@ -26,33 +39,38 @@ export default function SlotPicker({
   slots: number[];
   busy: { start: number; end: number; label?: string }[];
   need: number;
+  open: number;   // 방 운영 시작 — 시 휠 범위
+  close: number;  // 방 운영 종료
   selected: number | null;
   onSelect: (start: number) => void;
   expanded: boolean;
   onToggle: () => void;
 }) {
+  const toast = useToast();
   // 아직 확정하지 않은 휠 값. selected가 있으면 그쪽이 우선이다.
   const [draft, setDraft] = useState<number | null>(null);
   const wanted = selected ?? draft;
   const value = wanted !== null && slots.includes(wanted) ? wanted : (slots[0] ?? null);
 
-  const hours = [...new Set(slots.map(s => Math.floor(s / 60)))].sort((a, b) => a - b);
-  const minutes = value === null
-    ? []
-    : slots.filter(s => Math.floor(s / 60) === Math.floor(value / 60)).map(s => s % 60);
+  // 휠에는 운영시간 전체를 올린다 — 안 되는 시각을 고르면 알려주고 옮겨준다
+  const hours: number[] = [];
+  for (let h = Math.floor(open / 60); h <= Math.ceil(close / 60) - 1; h += 1) hours.push(h);
 
   const pick = (start: number) => {
     setDraft(start);
     if (selected !== null) onSelect(start);  // 이미 고른 방이면 바로 반영
   };
 
-  // 시를 바꾸면 그 시간대에서 지금 분과 가장 가까운 시각으로 옮긴다
-  const pickHour = (h: number) => {
-    if (value === null) return;
-    const cur = value % 60;
-    const cand = slots.filter(s => Math.floor(s / 60) === h);
-    if (!cand.length) return;
-    pick(cand.reduce((a, b) => (Math.abs((b % 60) - cur) < Math.abs((a % 60) - cur) ? b : a)));
+  /** 고른 시각이 안 되면 가장 가까운 예약 가능한 시각으로 옮기고 알린다 */
+  const pickOrNearest = (candidate: number) => {
+    if (slots.includes(candidate)) {
+      pick(candidate);
+      return;
+    }
+    const target = nearestSlot(slots, candidate);
+    if (target === null) return;
+    pick(target);
+    toast(`예약할 수 없는 시간입니다. 가장 가까운 ${toHM(target)}으로 옮겼습니다.`);
   };
 
   return (
@@ -122,7 +140,7 @@ export default function SlotPicker({
                       label="시"
                       items={hours.map(h => ({ value: h, label: pad(h) }))}
                       value={Math.floor(value / 60)}
-                      onChange={pickHour}
+                      onChange={h => pickOrNearest(h * 60 + (value % 60))}
                     />
                   </div>
                   <span
@@ -138,9 +156,9 @@ export default function SlotPicker({
                   <div className="flex-1">
                     <Wheel
                       label="분"
-                      items={minutes.map(m => ({ value: m, label: pad(m) }))}
+                      items={MINUTES.map(m => ({ value: m, label: pad(m) }))}
                       value={value % 60}
-                      onChange={m => pick(Math.floor(value / 60) * 60 + m)}
+                      onChange={m => pickOrNearest(Math.floor(value / 60) * 60 + m)}
                     />
                   </div>
                 </div>
