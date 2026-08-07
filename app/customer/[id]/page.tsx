@@ -105,14 +105,14 @@ export default function CustomerDetailPage() {
             </span>
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-sub">예약 건수</span>
-            <span className="text-sm font-bold tabular-nums">{reservations.length}건</span>
-          </div>
-          <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-sub">마지막 이용 일자</span>
             <span className="text-sm font-bold tabular-nums">
               {lastVisit ? fmtDate(lastVisit) : '—'}
             </span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-sub">총 예약 건수</span>
+            <span className="text-sm font-bold tabular-nums">{reservations.length}건</span>
           </div>
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-sub">누적 도장</span>
