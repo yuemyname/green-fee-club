@@ -16,11 +16,12 @@ import { useToast } from '@/components/ui/Toast';
 
 /** 30분 단위 시간 선택 */
 function TimeSel({
-  value, onChange, label,
+  value, onChange, label, compact = false,
 }: {
   value: number;
   onChange: (v: number) => void;
   label: string;
+  compact?: boolean;
 }) {
   const opts = [];
   for (let m = 0; m <= 1440; m += 30) opts.push(m);
@@ -29,7 +30,9 @@ function TimeSel({
       aria-label={label}
       value={value}
       onChange={e => onChange(Number(e.target.value))}
-      className="h-11 rounded-lg border border-line bg-white px-2 text-sm font-semibold tabular-nums outline-none focus:border-fair"
+      className={`h-11 rounded-lg border border-line bg-white text-sm font-semibold tabular-nums outline-none focus:border-fair ${
+        compact ? 'shrink-0 px-0.5' : 'px-2'
+      }`}
     >
       {opts.map(m => (
         <option key={m} value={m}>{toHM(m)}</option>
@@ -97,18 +100,18 @@ function BlockEditor({
           ))}
         </div>
       )}
-      <input
-        aria-label={`${idPrefix} 예약 불가 라벨`}
-        value={label}
-        onChange={e => setLabel(e.target.value)}
-        placeholder="점심시간"
-        className="h-11 w-full rounded-lg border border-line bg-white px-3 text-base outline-none placeholder:text-sub focus:border-fair"
-      />
-      <div className="mt-2 flex items-center gap-2">
-        <TimeSel label={`${idPrefix} 불가 시작`} value={start} onChange={setStart} />
-        <span className="text-sub">–</span>
-        <TimeSel label={`${idPrefix} 불가 종료`} value={end} onChange={setEnd} />
-        <Btn tone="ghost" onClick={add} className="ml-auto">+ 추가</Btn>
+      <div className="flex items-center gap-1.5">
+        <input
+          aria-label={`${idPrefix} 예약 불가 라벨`}
+          value={label}
+          onChange={e => setLabel(e.target.value)}
+          placeholder="점심시간"
+          className="h-11 min-w-0 flex-1 rounded-lg border border-line bg-white px-2 text-sm outline-none placeholder:text-sub focus:border-fair"
+        />
+        <TimeSel label={`${idPrefix} 불가 시작`} value={start} onChange={setStart} compact />
+        <span className="shrink-0 text-xs text-sub">–</span>
+        <TimeSel label={`${idPrefix} 불가 종료`} value={end} onChange={setEnd} compact />
+        <Btn tone="ghost" onClick={add} className="shrink-0 px-2.5">추가</Btn>
       </div>
     </Labeled>
   );
