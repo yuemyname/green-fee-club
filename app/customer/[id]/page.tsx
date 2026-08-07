@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { getCustomerProfile, type CustomerProfile } from '@/app/actions/customer';
 import { STAMP_GOAL } from '@/lib/constants';
@@ -33,27 +32,10 @@ export default function CustomerDetailPage() {
       .finally(() => setLoaded(true));
   }, [id]);
 
-  const back = (
-    <Link href="/customer" className="text-sm font-semibold text-sub">
-      ‹ 고객 목록
-    </Link>
-  );
-
-  if (!loaded) {
-    return (
-      <div>
-        {back}
-        <p className="mt-4 text-sm text-sub">불러오는 중…</p>
-      </div>
-    );
-  }
+  // 뒤로 가기는 헤더의 ‹ 버튼이 담당한다 (/customer 로 돌아간다)
+  if (!loaded) return <p className="text-sm text-sub">불러오는 중…</p>;
   if (!profile) {
-    return (
-      <div>
-        {back}
-        <p className="mt-4 text-sm font-semibold text-flag">고객을 찾을 수 없습니다.</p>
-      </div>
-    );
+    return <p className="text-sm font-semibold text-flag">고객을 찾을 수 없습니다.</p>;
   }
 
   const { customer, stampDates, couponUses, reservations } = profile;
@@ -84,8 +66,7 @@ export default function CustomerDetailPage() {
 
   return (
     <div>
-      {back}
-      <Eyebrow className="mt-3">CUSTOMER</Eyebrow>
+      <Eyebrow>CUSTOMER</Eyebrow>
       <h1 className="mt-1 text-2xl font-black text-deep" style={{ letterSpacing: '-0.02em' }}>
         {customer.name}
       </h1>
