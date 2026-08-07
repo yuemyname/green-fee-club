@@ -59,6 +59,9 @@ try {
   // 방 운영 상태 (false면 일시 중지)
   await client.query('alter table rooms add column if not exists active boolean not null default true');
 
+  // 도장이 어느 예약으로 찍혔는지 — 예약 삭제 시 그 도장만 정확히 회수한다
+  await client.query('alter table stamps add column if not exists reservation_id bigint');
+
   // 매장이 없으면 1건 생성
   let storeId;
   const store = await client.query('select id from stores order by id limit 1');

@@ -34,12 +34,13 @@ create table if not exists customers (
 create index if not exists customers_last4_idx on customers (last4);
 
 create table if not exists stamps (
-  id          bigserial primary key,
-  customer_id bigint not null references customers(id) on delete cascade,
-  date        text not null,             -- yyyymmdd
-  created_at  timestamptz not null default now(),
-  updated_at  timestamptz not null default now(),
-  deleted_at  timestamptz
+  id             bigserial primary key,
+  customer_id    bigint not null references customers(id) on delete cascade,
+  date           text not null,          -- yyyymmdd
+  reservation_id bigint,                 -- 입금 확인으로 찍힌 도장이면 그 예약 (예약 삭제 시 회수)
+  created_at     timestamptz not null default now(),
+  updated_at     timestamptz not null default now(),
+  deleted_at     timestamptz
 );
 
 create table if not exists rooms (

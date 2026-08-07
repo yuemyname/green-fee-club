@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { confirmPayment } from '@/app/actions/reservation';
+import { confirmPayment, deleteReservation } from '@/app/actions/reservation';
 import { STAMP_GOAL } from '@/lib/constants';
 import type { Segment } from '@/lib/timeline';
 import { fmtDur, toHM } from '@/lib/time';
@@ -12,7 +12,7 @@ import { useToast } from '@/components/ui/Toast';
 
 /**
  * 하루 타임라인을 세그먼트 리스트로.
- * 빈 구간 클릭 → /book 프리필 이동, 입금 대기 예약 클릭 → 입금 확인 패널.
+ * 빈 구간 클릭 → /book 프리필 이동, 예약 클릭 → 입금 확인·삭제 패널.
  */
 export default function RoomTimeline({
   segments,
@@ -48,6 +48,39 @@ export default function RoomTimeline({
       } else {
         toast(`${res.value.customerName}님 입금 확인 완료 · 도장 ${res.value.progress}/${STAMP_GOAL}`);
       }
+      setOpenId(null);
+      onChanged?.();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const remove = async (r: ReservationRow) => {
+    if (busy) return;
+    const undo = r.payment === 'manual'
+      ? '\n입금 확인으로 찍힌 도장 1개도 함께 회수됩니다.'
+      : r.payment === 'point'
+        ? '\n사용했던 무료 예약권 1장이 되돌아갑니다.'
+        : '';
+    const ok = window.confirm(
+      `${r.customer_name}님 ${toHM(r.start_min)}–${toHM(r.end_min)} 예약을 삭제할까요?${undo}`,
+    );
+    if (!ok) return;
+    setBusy(true);
+    try {
+      const res = await deleteReservation(r.id);
+      if (!res.ok) {
+        toast(res.error);
+        return;
+      }
+      const { customerName, stampRemoved, couponRestored } = res.value;
+      toast(
+        stampRemoved
+          ? `${customerName}님 예약을 삭제하고 도장 1개를 회수했습니다.`
+          : couponRestored
+            ? `${customerName}님 예약을 삭제하고 무료 예약권 1장을 되돌렸습니다.`
+            : `${customerName}님 예약을 삭제했습니다.`,
+      );
       setOpenId(null);
       onChanged?.();
     } finally {
@@ -130,21 +163,11 @@ export default function RoomTimeline({
             </>
           );
 
-          if (!pending) {
-            return (
-              <div
-                key={seg.start}
-                className="flex min-h-11 items-center justify-between rounded-lg border border-line bg-white px-3 py-2.5"
-              >
-                {row}
-              </div>
-            );
-          }
-
           return (
             <div key={seg.start} className="rounded-lg border border-line bg-white">
               <button
                 type="button"
+                aria-label={`${r.customer_name} ${range} 예약`}
                 onClick={() => setOpenId(openId === r.id ? null : r.id)}
                 className="flex min-h-11 w-full items-center justify-between px-3 py-2.5 text-left transition-opacity active:opacity-80"
               >
@@ -152,27 +175,54 @@ export default function RoomTimeline({
               </button>
               {openId === r.id && (
                 <div className="space-y-2 border-t border-line p-3">
-                  <p className="text-xs text-sub">입금을 어떻게 확인할까요?</p>
-                  <div className="flex gap-2">
-                    <Btn
-                      onClick={() => confirm(r.id, 'manual')}
-                      disabled={busy}
-                      className="flex-1"
-                    >
-                      입금 확인
-                    </Btn>
-                    <Btn
-                      tone="flag"
-                      onClick={() => confirm(r.id, 'point')}
-                      disabled={busy || r.customer_coupons < 1}
-                      className="flex-1"
-                    >
-                      포인트 사용{r.customer_coupons > 0 ? ` (무료 ${r.customer_coupons}회)` : ' (없음)'}
-                    </Btn>
-                  </div>
-                  <p className="text-[11px] leading-relaxed text-sub">
-                    입금 확인은 도장 1개가 적립되고, 포인트 사용은 무료 예약권 1장이 차감되며 도장이 적립되지 않습니다.
-                  </p>
+                  {pending ? (
+                    <>
+                      <p className="text-xs text-sub">입금을 어떻게 확인할까요?</p>
+                      <div className="flex gap-2">
+                        <Btn
+                          onClick={() => confirm(r.id, 'manual')}
+                          disabled={busy}
+                          className="flex-1"
+                        >
+                          입금 확인
+                        </Btn>
+                        <Btn
+                          tone="flag"
+                          onClick={() => confirm(r.id, 'point')}
+                          disabled={busy || r.customer_coupons < 1}
+                          className="flex-1"
+                        >
+                          포인트 사용{r.customer_coupons > 0 ? ` (무료 ${r.customer_coupons}회)` : ' (없음)'}
+                        </Btn>
+                      </div>
+                      <p className="text-[11px] leading-relaxed text-sub">
+                        입금 확인은 도장 1개가 적립되고, 포인트 사용은 무료 예약권 1장이 차감되며 도장이 적립되지 않습니다.
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-xs text-sub">
+                      {r.payment === 'point'
+                        ? '무료 예약권으로 확정된 예약입니다.'
+                        : '입금 확인된 예약입니다. 도장 1개가 적립되어 있습니다.'}
+                    </p>
+                  )}
+
+                  <Btn
+                    tone="ghost"
+                    onClick={() => remove(r)}
+                    disabled={busy}
+                    className="w-full"
+                    style={{ borderColor: 'var(--color-flag)', color: 'var(--color-flag)' }}
+                  >
+                    예약 삭제
+                  </Btn>
+                  {!pending && (
+                    <p className="text-[11px] leading-relaxed text-sub">
+                      {r.payment === 'point'
+                        ? '삭제하면 무료 예약권 1장이 되돌아갑니다.'
+                        : '삭제하면 이 예약으로 찍힌 도장 1개도 함께 회수됩니다.'}
+                    </p>
+                  )}
                 </div>
               )}
             </div>

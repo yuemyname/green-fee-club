@@ -94,6 +94,76 @@ export async function createReservation(
   }
 }
 
+export interface DeleteResult {
+  customerName: string;
+  stampRemoved: boolean;   // 입금 확인으로 찍혔던 도장을 회수했는지
+  couponRestored: boolean; // 사용했던 무료 예약권을 되돌렸는지
+}
+
+/**
+ * 예약 삭제 — 소프트 삭제.
+ * 입금 확인으로 찍힌 도장은 함께 회수하고, 포인트로 결제한 예약은 예약권을 되돌린다.
+ * 그냥 지우면 오지 않은 손님의 도장·예약권이 남기 때문이다.
+ */
+export async function deleteReservation(
+  reservationId: number,
+): Promise<{ ok: true; value: DeleteResult } | { ok: false; error: string }> {
+  if (!(await isOwner())) return { ok: false, error: '권한이 없습니다.' };
+  const client = await pool().connect();
+  try {
+    await client.query('begin');
+    const found = await client.query(
+      `select r.id, r.date, r.payment, r.customer_id, c.name, c.used_coupons
+       from reservations r
+       join customers c on c.id = r.customer_id
+       where r.id = $1 and r.deleted_at is null
+       for update of r, c`,
+      [reservationId],
+    );
+    if (!found.rows.length) {
+      await client.query('rollback');
+      return { ok: false, error: '예약을 찾을 수 없습니다.' };
+    }
+    const r = found.rows[0];
+
+    await client.query('update reservations set deleted_at = now() where id = $1', [reservationId]);
+
+    let stampRemoved = false;
+    let couponRestored = false;
+
+    if (r.payment === 'manual') {
+      // 이 예약으로 찍힌 도장. 연결 정보가 없는 옛 도장은 같은 날 마지막 도장으로 찾는다.
+      const del = await client.query(
+        `update stamps set deleted_at = now()
+         where id = (
+           select id from stamps
+           where deleted_at is null and customer_id = $1
+             and (reservation_id = $2 or (reservation_id is null and date = $3))
+           order by (reservation_id = $2) desc, created_at desc, id desc
+           limit 1
+         )`,
+        [r.customer_id, reservationId, r.date],
+      );
+      stampRemoved = (del.rowCount ?? 0) > 0;
+    } else if (r.payment === 'point') {
+      const upd = await client.query(
+        `update customers set used_coupons = greatest(used_coupons - 1, 0)
+         where id = $1 and used_coupons > 0`,
+        [r.customer_id],
+      );
+      couponRestored = (upd.rowCount ?? 0) > 0;
+    }
+
+    await client.query('commit');
+    return { ok: true, value: { customerName: r.name, stampRemoved, couponRestored } };
+  } catch (e) {
+    await client.query('rollback').catch(() => {});
+    throw e;
+  } finally {
+    client.release();
+  }
+}
+
 export interface ConfirmResult {
   customerName: string;
   method: 'manual' | 'point';
@@ -135,9 +205,10 @@ export async function confirmPayment(
         `update reservations set payment = 'manual', paid_at = now() where id = $1`,
         [reservationId],
       );
-      await client.query('insert into stamps (customer_id, date) values ($1,$2)', [
-        r.customer_id, r.date,
-      ]);
+      await client.query(
+        'insert into stamps (customer_id, date, reservation_id) values ($1,$2,$3)',
+        [r.customer_id, r.date, reservationId],
+      );
       const stamps = await client.query(
         'select count(*)::int as total from stamps where customer_id = $1 and deleted_at is null',
         [r.customer_id],
