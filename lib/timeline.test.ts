@@ -114,20 +114,38 @@ describe('slotsFor', () => {
     expect(slotsFor(segs, 70)).toEqual([480]);
   });
 
-  it('시작을 30분 단위로 올림하고 30분씩 증가한다', () => {
-    // 예약 480~500 → 빈 구간 500~1440, 시작 510부터
-    const segs = buildTimeline([res(1, 'd', 480, 500)], 1, 'd');
+  it('시작을 10분 단위로 올림하고 10분씩 증가한다', () => {
+    // 예약 480~495 → 빈 구간 495~1440, 시작 500부터
+    const segs = buildTimeline([res(1, 'd', 480, 495)], 1, 'd');
     const slots = slotsFor(segs, 70);
-    expect(slots[0]).toBe(510);
-    expect(slots[1]).toBe(540);
+    expect(slots[0]).toBe(500);
+    expect(slots[1]).toBe(510);
+  });
+
+  it('앞 예약이 끝나는 시각에 바로 붙여 예약할 수 있다', () => {
+    // 08:00~09:10(70분) 예약 → 빈 구간 550~1440, 첫 시작은 09:10
+    const segs = buildTimeline([res(1, 'd', 480, 550)], 1, 'd');
+    expect(slotsFor(segs, 70)[0]).toBe(550);
   });
 
   it('빈 하루면 저녁까지 모든 시작 시각을 준다', () => {
     const segs = buildTimeline([], 1, 'd'); // 480~1440
     const slots = slotsFor(segs, 70);
     expect(slots[0]).toBe(480);
-    expect(slots[slots.length - 1]).toBe(1350); // 22:30 시작 (22:30+70분 ≤ 24:00)
-    expect(slots).toHaveLength(30);
+    expect(slots[slots.length - 1]).toBe(1370); // 22:50 시작 (22:50+70분 = 24:00)
+    expect(slots).toHaveLength(90);
+  });
+
+  it('from을 주면 그 시각 이전 시작은 뺀다', () => {
+    const segs = buildTimeline([], 1, 'd');
+    const slots = slotsFor(segs, 70, 1051); // 17:31
+    expect(slots[0]).toBe(1060);            // 17:40
+    expect(slots.every(s => s >= 1051)).toBe(true);
+  });
+
+  it('from이 구간보다 이르면 무시된다', () => {
+    const segs = buildTimeline([], 1, 'd');
+    expect(slotsFor(segs, 70, 300)[0]).toBe(480);
   });
 
   it('종일 예약이면 슬롯이 없다', () => {

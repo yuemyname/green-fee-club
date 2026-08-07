@@ -1,4 +1,4 @@
-import { OPEN, CLOSE } from './constants';
+import { OPEN, CLOSE, SLOT_STEP } from './constants';
 import type { Block, Reservation } from './types';
 
 export type Segment<R extends Reservation = Reservation> =
@@ -59,13 +59,17 @@ export function buildTimeline<R extends Reservation>(
   return segs;
 }
 
-/** 필요 시간이 들어가는 시작 가능 시각 목록 — 30분 단위, 구간 전체 */
-export function slotsFor(timeline: Segment[], need: number): number[] {
+/**
+ * 필요 시간이 들어가는 시작 가능 시각 목록 — SLOT_STEP(10분) 단위, 구간 전체.
+ * from을 주면 그 시각보다 이른 시작 시각은 뺀다 (오늘의 지난 시간 숨기기).
+ */
+export function slotsFor(timeline: Segment[], need: number, from = 0): number[] {
   const out: number[] = [];
   for (const g of timeline) {
     if (g.type !== 'open' || g.end - g.start < need) continue;
-    let s = Math.ceil(g.start / 30) * 30;
-    for (; s + need <= g.end; s += 30) out.push(s);
+    const begin = Math.max(g.start, from);
+    let s = Math.ceil(begin / SLOT_STEP) * SLOT_STEP;
+    for (; s + need <= g.end; s += SLOT_STEP) out.push(s);
   }
   return out;
 }

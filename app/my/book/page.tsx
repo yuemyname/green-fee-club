@@ -7,7 +7,7 @@ import {
   type MyBoard,
 } from '@/app/actions/my';
 import { buildTimeline, slotsFor } from '@/lib/timeline';
-import { fmtDate, fmtDur, needMin, toHM, todayStr } from '@/lib/time';
+import { fmtDate, fmtDur, needMin, nowMin, toHM, todayStr } from '@/lib/time';
 import type { Reservation } from '@/lib/types';
 import Btn from '@/components/ui/Btn';
 import DatePicker from '@/components/ui/DatePicker';
@@ -84,7 +84,8 @@ function MyBookInner() {
         blocks: board.blocks,
       });
       map.set(room.id, {
-        slots: slotsFor(timeline, need),
+        // 오늘은 이미 지난 시간을 후보에서 뺀다
+        slots: slotsFor(timeline, need, date === todayStr() ? nowMin() : 0),
         busy: timeline
           .filter(s => s.type !== 'open')
           .map(s => ({

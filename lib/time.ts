@@ -32,6 +32,12 @@ export function todayStr(): string {
   return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
 }
 
+/** 지금 시각을 자정으로부터의 분으로 (17:31 → 1051) */
+export function nowMin(): number {
+  const d = new Date();
+  return d.getHours() * 60 + d.getMinutes();
+}
+
 /** 인원수 → 필요 시간(분), 10분 단위 올림 */
 export function needMin(people: number): number {
   return Math.ceil((people * MIN_PER_PERSON) / 10) * 10;

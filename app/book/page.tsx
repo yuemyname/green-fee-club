@@ -4,9 +4,9 @@ import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { findCustomersByLast4 } from '@/app/actions/customer';
 import { createReservation, listBoard, type Board } from '@/app/actions/reservation';
-import { STAMP_GOAL } from '@/lib/constants';
+import { SLOT_STEP, STAMP_GOAL } from '@/lib/constants';
 import { buildTimeline, slotsFor } from '@/lib/timeline';
-import { fmtDate, fmtDur, needMin, toHM, todayStr } from '@/lib/time';
+import { fmtDate, fmtDur, needMin, nowMin, toHM, todayStr } from '@/lib/time';
 import type { CustomerOverview } from '@/lib/types';
 import Btn from '@/components/ui/Btn';
 import DatePicker from '@/components/ui/DatePicker';
@@ -37,8 +37,12 @@ function BookInner() {
   const [busy, setBusy] = useState(false);
   const [prefilled, setPrefilled] = useState(false);
   const [expandedRoom, setExpandedRoom] = useState<number | null>(null);
+  const [showPast, setShowPast] = useState(false);
 
   const need = needMin(people);
+  const isToday = date === todayStr();
+  // 오늘은 지난 시간을 감춘다 — 손님이 그냥 온 경우를 위해 토글로 열 수 있다
+  const from = isToday && !showPast ? nowMin() : 0;
 
   const refresh = (d: string) =>
     listBoard(d).then(setBoard).catch(() => {});
@@ -61,7 +65,7 @@ function BookInner() {
         blocks: board.blocks,
       });
       map.set(room.id, {
-        slots: slotsFor(timeline, need),
+        slots: slotsFor(timeline, need, from),
         busy: timeline
           .filter(s => s.type !== 'open')
           .map(s => ({
@@ -72,7 +76,7 @@ function BookInner() {
       });
     }
     return map;
-  }, [board, date, need]);
+  }, [board, date, need, from]);
 
   // 최초·조건 변경 시 예약 가능한 시간이 있는 첫 방만 자동으로 펼친다
   useEffect(() => {
@@ -88,7 +92,7 @@ function BookInner() {
     const room = Number(params.get('room'));
     const start = Number(params.get('start'));
     if (!room || !params.get('start') || Number.isNaN(start)) return;
-    const aligned = Math.ceil(start / 30) * 30;
+    const aligned = Math.ceil(start / SLOT_STEP) * SLOT_STEP;
     if (roomData.get(room)?.slots.includes(aligned)) {
       setSelection({ roomId: room, start: aligned });
       setExpandedRoom(room);
@@ -199,7 +203,26 @@ function BookInner() {
         <span className="text-sub">(1인 63분 기준)</span>
       </div>
 
-      {/* 4. 방별 시작 가능 시간 */}
+      {/* 4. 오늘은 지난 시간을 감춘다 — 소급 입력이 필요하면 켤 수 있다 */}
+      {isToday && (
+        <label className="mt-3 flex min-h-11 items-center gap-2 text-sm font-semibold">
+          <input
+            type="checkbox"
+            checked={showPast}
+            onChange={e => {
+              setShowPast(e.target.checked);
+              setSelection(null);
+            }}
+            className="size-5 accent-(--color-fair)"
+          />
+          지난 시간도 보기
+          <span className="text-xs font-normal text-sub tabular-nums">
+            (지금 {toHM(nowMin())})
+          </span>
+        </label>
+      )}
+
+      {/* 5. 방별 시작 가능 시간 */}
       {board && (
         <div className="mt-4 space-y-4">
           {board.rooms.filter(r => r.active).length === 0 && (

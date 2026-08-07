@@ -19,3 +19,7 @@ body {
   color: var(--color-ink);
   font-family: var(--font-sans);
 }
+
+/* 휠 피커 — 스크롤바를 감춘다 */
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
