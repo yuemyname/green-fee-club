@@ -313,13 +313,13 @@ function RoomEditor({
 
 /**
  * 등록된 방 이름을 보고 다음 방 이름을 제안한다.
- * 'N번방' 패턴으로 일관되면 다음 번호를, 아니면 안내 문구를 반환한다.
+ * 'N번방' 패턴으로 일관될 때만 제안하고, 이름이 제각각이면 null.
  */
-function nextRoomHint(rooms: Room[] | null): string {
-  if (!rooms) return '방 이름을 등록하세요';
+function nextRoomName(rooms: Room[] | null): string | null {
+  if (!rooms) return null;
   if (rooms.length === 0) return '1번방';
   const nums = rooms.map(r => /^(\d+)번방$/.exec(r.name.trim())?.[1]);
-  if (nums.some(n => n === undefined)) return '방 이름을 등록하세요';
+  if (nums.some(n => n === undefined)) return null;
   return `${Math.max(...nums.map(n => Number(n))) + 1}번방`;
 }
 
@@ -343,7 +343,9 @@ export default function RoomsPage() {
   const [blStart, setBlStart] = useState(720);
   const [blEnd, setBlEnd] = useState(780);
 
-  const nameHint = nextRoomHint(rooms);
+  // 이름을 비워두면 제안 이름으로 자동 등록된다
+  const suggestedName = nextRoomName(rooms);
+  const effectiveName = newName.trim() || suggestedName || '';
 
   const refresh = () => {
     listRooms().then(setRooms).catch(() => setRooms([]));
@@ -355,8 +357,8 @@ export default function RoomsPage() {
     if (busy) return;
     setBusy(true);
     try {
-      const res = await createRoom(newName, newOpen, newClose, newBlocks);
-      toast(res.ok ? `${newName.trim()}이(가) 추가되었습니다.` : res.error);
+      const res = await createRoom(effectiveName, newOpen, newClose, newBlocks);
+      toast(res.ok ? `${effectiveName}이(가) 추가되었습니다.` : res.error);
       if (res.ok) {
         setNewName('');
         setNewBlocks([]);
@@ -411,12 +413,15 @@ export default function RoomsPage() {
       <section className="mt-5">
         <h2 className="text-sm font-bold text-deep">신규 방 등록</h2>
         <Card className="mt-2 space-y-4 bg-turf">
-          <Labeled label="방 이름">
+          <Labeled
+            label="방 이름"
+            hint={suggestedName ? '(비워두면 아래 이름으로 등록됩니다)' : undefined}
+          >
             <input
               aria-label="새 방 이름"
               value={newName}
               onChange={e => setNewName(e.target.value)}
-              placeholder={nameHint}
+              placeholder={suggestedName ?? '방 이름을 등록하세요'}
               className="h-11 w-full rounded-lg border border-line bg-white px-3 text-base outline-none placeholder:text-sub focus:border-fair"
             />
           </Labeled>
@@ -436,8 +441,8 @@ export default function RoomsPage() {
             onAdd={b => setNewBlocks(list => [...list, b])}
           />
 
-          <Btn onClick={addRoom} disabled={busy || !newName.trim()} className="w-full">
-            방 등록
+          <Btn onClick={addRoom} disabled={busy || !effectiveName} className="w-full">
+            {effectiveName && !newName.trim() ? `${effectiveName} 등록` : '방 등록'}
           </Btn>
         </Card>
       </section>
