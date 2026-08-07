@@ -108,16 +108,16 @@ function BlockEditor({
           onChange={e => setLabel(e.target.value)}
           maxLength={10}
           placeholder="불가 사유"
-          className="h-11 w-28 shrink-0 rounded-lg border border-line bg-white px-1.5 text-sm outline-none placeholder:text-sub focus:border-fair"
+          className="h-11 w-28 shrink-0 rounded-lg border border-line bg-white px-1.5 text-sm outline-none placeholder:text-sub focus:border-fair sm:w-auto sm:flex-1 sm:px-3 sm:text-base"
         />
         <TimeSel label={`${idPrefix} 불가 시작`} value={start} onChange={setStart} compact />
         <span className="shrink-0 text-xs text-sub">–</span>
         <TimeSel label={`${idPrefix} 불가 종료`} value={end} onChange={setEnd} compact />
-        <Btn tone="ghost" onClick={add} className="ml-auto shrink-0 px-2.5">추가</Btn>
+        <Btn tone="ghost" onClick={add} className="ml-auto shrink-0 px-2.5 sm:ml-0">추가</Btn>
       </div>
       {onApplyAll && (
         <div className="mt-2 flex justify-end">
-          <Btn tone="ghost" onClick={onApplyAll}>모든 방에 적용</Btn>
+          <Btn tone="ghost" onClick={onApplyAll}>불가시간 일괄 적용</Btn>
         </div>
       )}
     </Labeled>
@@ -357,7 +357,7 @@ function RoomEditor({
           <span className="text-sub">–</span>
           <TimeSel label={`${room.name} 운영 종료`} value={close} onChange={setClose} />
           <Btn tone="ghost" onClick={() => setBulkOpen(true)} disabled={busy} className="ml-auto">
-            모든 방에 적용
+            운영시간 일괄 적용
           </Btn>
         </div>
       </Labeled>
