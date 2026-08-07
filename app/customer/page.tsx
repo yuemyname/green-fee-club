@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { createCustomer, searchCustomers, type CustomerSearch } from '@/app/actions/customer';
-import { STAMP_GOAL } from '@/lib/constants';
 import Btn from '@/components/ui/Btn';
 import Card from '@/components/ui/Card';
 import Eyebrow from '@/components/ui/Eyebrow';
@@ -104,19 +103,12 @@ export default function CustomerPage() {
                   <p className="text-sm font-bold">{c.name}</p>
                   <p className="mt-0.5 text-xs text-sub tabular-nums">{c.phone}</p>
                 </div>
-                <div className="flex items-center gap-3">
-                  <div className="text-right">
-                    <p className="text-sm font-bold text-fair tabular-nums">
-                      {c.progress} / {STAMP_GOAL}
-                    </p>
-                    {c.coupons > 0 && (
-                      <p className="mt-0.5 text-xs font-bold text-flag tabular-nums">
-                        무료 {c.coupons}회
-                      </p>
-                    )}
-                  </div>
-                  <span className="text-sub">›</span>
-                </div>
+                <span
+                  aria-hidden
+                  className="flex size-8 shrink-0 items-center justify-center rounded-full border border-line text-base font-bold text-sub"
+                >
+                  ›
+                </span>
               </Card>
             </Link>
           ))}

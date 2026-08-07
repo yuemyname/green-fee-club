@@ -79,7 +79,8 @@ export default function CustomerDetailPage() {
     };
   };
 
-  const upcoming = reservations.filter(r => r.date >= today).length;
+  // 예약은 최근순 — 오늘 이전(포함)의 첫 건이 마지막 이용일
+  const lastVisit = reservations.find(r => r.date <= today)?.date ?? null;
 
   return (
     <div>
@@ -89,51 +90,38 @@ export default function CustomerDetailPage() {
         {customer.name}
       </h1>
 
-      <Card className="mt-4 space-y-2 bg-turf">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-semibold text-sub">전화번호</span>
-          <span className="text-sm font-bold tabular-nums">{customer.phone}</span>
-        </div>
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-semibold text-sub">등록일</span>
-          <span className="text-sm font-bold tabular-nums">
-            {profile.joinedAt ? fmtDate(profile.joinedAt) : '—'}
-          </span>
-        </div>
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-semibold text-sub">누적 도장</span>
-          <span className="text-sm font-bold tabular-nums">
-            {customer.totalStamps}개 · 현재 카드 {customer.progress}/{STAMP_GOAL}
-          </span>
-        </div>
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-semibold text-sub">무료 예약권</span>
-          <span className="text-sm font-black text-flag tabular-nums">
-            {customer.coupons}회 사용 가능
-          </span>
-        </div>
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-semibold text-sub">예약</span>
-          <span className="text-sm font-bold tabular-nums">
-            전체 {reservations.length}건 · 다가오는 예약 {upcoming}건
-          </span>
-        </div>
-      </Card>
-
-      <section className="mt-8">
-        <h2 className="text-sm font-bold text-deep">포인트 현황</h2>
-        <p className="mt-1 text-xs text-sub tabular-nums">{remain}회 더 이용하면 무료 예약 1회</p>
-        <div className="mt-2 grid gap-3 sm:grid-cols-2">
-          {cards.map((cardDates, i) => (
-            <StampCard
-              key={i}
-              dates={cardDates}
-              coupon={cardDates.length >= STAMP_GOAL ? couponState(i) : undefined}
-            />
-          ))}
-        </div>
+      {/* 1. 손님 정보 */}
+      <section className="mt-5">
+        <h2 className="text-sm font-bold text-deep">손님 정보</h2>
+        <Card className="mt-2 space-y-2 bg-turf">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-sub">전화번호</span>
+            <span className="text-sm font-bold tabular-nums">{customer.phone}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-sub">등록일</span>
+            <span className="text-sm font-bold tabular-nums">
+              {profile.joinedAt ? fmtDate(profile.joinedAt) : '—'}
+            </span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-sub">예약 건수</span>
+            <span className="text-sm font-bold tabular-nums">{reservations.length}건</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-sub">마지막 이용 일자</span>
+            <span className="text-sm font-bold tabular-nums">
+              {lastVisit ? fmtDate(lastVisit) : '—'}
+            </span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-sub">누적 도장</span>
+            <span className="text-sm font-bold tabular-nums">{customer.totalStamps}개</span>
+          </div>
+        </Card>
       </section>
 
+      {/* 2. 예약 내역 */}
       <section className="mt-8">
         <h2 className="text-sm font-bold text-deep">
           예약 내역{' '}
@@ -168,6 +156,21 @@ export default function CustomerDetailPage() {
                 {PAYMENT_LABEL[r.payment]}
               </span>
             </Card>
+          ))}
+        </div>
+      </section>
+
+      {/* 3. 포인트 현황 */}
+      <section className="mt-8">
+        <h2 className="text-sm font-bold text-deep">포인트 현황</h2>
+        <p className="mt-1 text-xs text-sub tabular-nums">{remain}회 더 이용하면 무료 예약 1회</p>
+        <div className="mt-2 grid gap-3 sm:grid-cols-2">
+          {cards.map((cardDates, i) => (
+            <StampCard
+              key={i}
+              dates={cardDates}
+              coupon={cardDates.length >= STAMP_GOAL ? couponState(i) : undefined}
+            />
           ))}
         </div>
       </section>
