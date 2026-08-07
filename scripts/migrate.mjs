@@ -101,42 +101,36 @@ try {
     console.log(`관리자 생성: ${username}`);
   }
 
-  // 기존 DB에 남아있는 샘플 고객/도장/예약을 1회만 삭제한다.
-  // (관리자·매장·방·예약 불가 시간 설정은 유지)
+  // ── 1회성 데이터 초기화 ──────────────────────────────────────────────
+  // app_flags에 키가 없을 때만 실행되고, 실행 후 키를 남겨 다시 돌지 않는다.
+  // 그래서 초기화 이후에 쌓인 실제 운영 데이터는 절대 지워지지 않는다.
+  // 매장·관리자 계정은 어떤 경우에도 건드리지 않는다.
   await client.query(
     `create table if not exists app_flags (
        key text primary key,
        created_at timestamptz default now()
      )`,
   );
-  const cleaned = await client.query(
-    `select 1 from app_flags where key = 'sample_data_cleaned'`,
-  );
-  if (!cleaned.rows.length) {
-    const r = await client.query('delete from reservations');
-    const s = await client.query('delete from stamps');
-    const c = await client.query('delete from customers');
-    await client.query(`insert into app_flags (key) values ('sample_data_cleaned')`);
-    console.log(`샘플 데이터 삭제: 예약 ${r.rowCount}건, 도장 ${s.rowCount}개, 고객 ${c.rowCount}명`);
-  }
+  // 외래키 때문에 예약 → 도장/불가시간 → 고객/방 순으로 지운다
+  const ALL_DATA = ['reservations', 'stamps', 'blocks', 'customers', 'rooms'];
+  const resetOnce = async (key, tables, label) => {
+    const done = await client.query('select 1 from app_flags where key = $1', [key]);
+    if (done.rows.length) return;
+    const counts = [];
+    for (const t of tables) {
+      const r = await client.query(`delete from ${t}`);
+      counts.push(`${t} ${r.rowCount}`);
+    }
+    await client.query('insert into app_flags (key) values ($1)', [key]);
+    console.log(`${label}: ${counts.join(', ')}`);
+  };
 
-  // 2차 정리: 고객 데이터와 방 데이터(예약 불가 시간 포함)까지 1회만 삭제.
-  // 관리자·매장 정보만 남긴다. 방은 방 관리 화면에서 직접 등록한다.
-  const cleaned2 = await client.query(
-    `select 1 from app_flags where key = 'sample_data_cleaned_v2'`,
-  );
-  if (!cleaned2.rows.length) {
-    const r = await client.query('delete from reservations');
-    const s = await client.query('delete from stamps');
-    const c = await client.query('delete from customers');
-    const b = await client.query('delete from blocks');
-    const rm = await client.query('delete from rooms');
-    await client.query(`insert into app_flags (key) values ('sample_data_cleaned_v2')`);
-    console.log(
-      `2차 정리: 예약 ${r.rowCount}건, 도장 ${s.rowCount}개, 고객 ${c.rowCount}명, ` +
-      `예약 불가 ${b.rowCount}건, 방 ${rm.rowCount}개 삭제`,
-    );
-  }
+  // 1차 — 샘플 고객/도장/예약 삭제 (방과 예약 불가 시간은 유지)
+  await resetOnce('sample_data_cleaned', ['reservations', 'stamps', 'customers'], '샘플 데이터 삭제');
+  // 2차 — 방과 예약 불가 시간까지 삭제
+  await resetOnce('sample_data_cleaned_v2', ALL_DATA, '2차 정리');
+  // 3차 — 방·고객·예약 전체 초기화 (요청: 운영 시작 전 클린 상태)
+  await resetOnce('data_reset_v3', ALL_DATA, '3차 초기화');
 } finally {
   await client.end();
 }
